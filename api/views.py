@@ -1,5 +1,5 @@
 from rest_framework.views import APIView
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions ,parsers
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -19,7 +19,11 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 
-
+from rest_framework import permissions
+from django.db.models import Sum, Count, Avg
+from django.utils import timezone
+from datetime import timedelta
+import random
 class RegisterView(generics.CreateAPIView):
     serializer_class = UserRegisterSerializer
     permission_classes = [permissions.AllowAny]
@@ -151,8 +155,21 @@ class VerifyOTPView(APIView):
 class BookRideView(generics.CreateAPIView):
     serializer_class = RideSerializer
     permission_classes = [permissions.IsAuthenticated]
+
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        distance = float(self.request.data.get("distance_km"))
+        vehicle_type = self.request.data.get("vehicle_type")
+
+        fare = calculate_fare(vehicle_type, distance)
+        driver_incentive, customer_reward = calculate_incentives_and_rewards(distance)
+
+        serializer.save(
+            user=self.request.user,
+            fare=fare,
+            driver_incentive=driver_incentive,
+            customer_reward=customer_reward
+        )
+
 
 class RideHistoryView(generics.ListAPIView):
     serializer_class = RideSerializer
@@ -347,9 +364,13 @@ class AdminUserListView(generics.ListAPIView):
     
 class AdminUserEditView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = UserRegisterSerializer
+    serializer_class = UserEditSerializer
     queryset = User.objects.all()
-    lookup_field = 'id'      
+    lookup_field = 'id'
+
+    # allow form-data, files, JSON
+    parser_classes = [parsers.FormParser, parsers.MultiPartParser, parsers.JSONParser]
+      
  
 class AdminUserDeleteView(generics.DestroyAPIView):
     permission_classes = [IsAuthenticated]
@@ -393,7 +414,7 @@ class AdminDriverApprovalView(APIView):
  
 class AdminRideListView(generics.ListAPIView):
     permission_classes = [permissions.IsAdminUser]
-    serializer_class = RideSerializer
+    serializer_class = AdminRideSerializer
     queryset = Ride.objects.all()
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['pickup', 'drop', 'user__username', 'driver__username']
@@ -615,7 +636,6 @@ class RideStatusUpdateView(APIView):
                 "statusMessage": "Invalid status update."
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate user is a driver
         if not getattr(user, 'is_driver', False):
             return Response({
                 "statusCode": "0",
@@ -624,7 +644,7 @@ class RideStatusUpdateView(APIView):
 
         ride = get_object_or_404(Ride, id=ride_id)
 
-        # Business logic for status transitions
+        
         if new_status == 'accepted':
             if ride.status != 'pending':
                 return Response({
@@ -640,7 +660,6 @@ class RideStatusUpdateView(APIView):
             ride.status = 'accepted'
 
         elif new_status == 'completed':
-            # Only driver who accepted can complete
             if ride.status != 'accepted':
                 return Response({
                     "statusCode": "0",
@@ -677,3 +696,212 @@ class RideStatusUpdateView(APIView):
             "ride": serializer.data
         })
         
+
+class AdminDashboardView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        try:
+            today = timezone.now().date()
+            week_ago = today - timedelta(days=6)
+
+            dashboard_stats = {
+                "activeRides": Ride.objects.filter(status='accepted').count(),
+                "totalRevenue": Payment.objects.filter(paid=True).aggregate(total=Sum('ride__fare'))['total'] or 0,
+                "revenueGrowth": self.calculate_revenue_growth(),
+                "totalUsers": User.objects.filter(is_user=True).count(),
+                "newUsersToday": User.objects.filter(is_user=True, date_joined__date=today).count(),
+                "totalDrivers": User.objects.filter(is_driver=True).count(),
+                "onlineDrivers": DriverLocation.objects.filter(updated_at__gte=timezone.now() - timedelta(minutes=15)).count(),
+                "todayRides": Ride.objects.filter(created_at__date=today).count(),
+                "todayRevenue": Payment.objects.filter(paid=True, ride__created_at__date=today).aggregate(total=Sum('ride__fare'))['total'] or 0,
+                "avgRating": Ride.objects.filter(rating__isnull=False).aggregate(avg=Avg('rating'))['avg'] or 0
+            }
+            revenue_chart = self.get_revenue_chart_data(week_ago, today)
+            ride_chart = self.get_ride_chart_data(week_ago, today)
+
+            return Response({
+                "statusCode": "1",
+                "statusMessage": "Dashboard data retrieved successfully",
+                "dashboardStats": dashboard_stats,
+                "revenueChart": revenue_chart,
+                "rideChart": ride_chart
+            })
+
+        except Exception as e:
+            return Response({
+                "statusCode": "0",
+                "statusMessage": f"Error retrieving dashboard data: {str(e)}"
+            }, status=500)
+
+    def calculate_revenue_growth(self):
+        today = timezone.now().date()
+        current_week_start = today - timedelta(days=today.weekday())
+        previous_week_start = current_week_start - timedelta(days=7)
+        
+        current_week_revenue = Payment.objects.filter(
+            paid=True,
+            ride__created_at__date__gte=current_week_start,
+            ride__created_at__date__lte=today
+        ).aggregate(total=Sum('ride__fare'))['total'] or 0
+        
+        previous_week_revenue = Payment.objects.filter(
+            paid=True,
+            ride__created_at__date__gte=previous_week_start,
+            ride__created_at__date__lte=previous_week_start + timedelta(days=6)
+        ).aggregate(total=Sum('ride__fare'))['total'] or 0
+        
+        if previous_week_revenue == 0:
+            return 0 if current_week_revenue == 0 else 100
+        return ((current_week_revenue - previous_week_revenue) / previous_week_revenue * 100)
+
+    def get_revenue_chart_data(self, start_date, end_date):
+        labels = [(start_date + timedelta(days=x)).strftime('%a') for x in range(7)]
+        revenue_data = []
+        
+        for i in range(7):
+            date = start_date + timedelta(days=i)
+            total = Payment.objects.filter(
+                paid=True,
+                ride__created_at__date=date
+            ).aggregate(total=Sum('ride__fare'))['total'] or 0
+            revenue_data.append(total)
+        
+        return {
+            "labels": labels,
+            "revenue": revenue_data
+        }
+
+    def get_ride_chart_data(self, start_date, end_date):
+        days = (end_date - start_date).days + 1
+        labels = [(start_date + timedelta(days=x)).strftime('%a') for x in range(days)]
+        ride_data = []
+
+        for i in range(days):
+            date = start_date + timedelta(days=i)
+            count = Ride.objects.filter(created_at__date=date).count()
+            ride_data.append(count)
+
+        return {
+            "labels": labels,
+            "rides": ride_data
+        }
+
+        
+def calculate_fare(vehicle_type, distance):
+    fare = 0
+    if vehicle_type == "bike":
+        if distance > 10:
+            fare = distance * 10
+        elif 5 <= distance <= 10:
+            fare = distance * 9
+        else:
+            fare = distance * 8
+
+    elif vehicle_type == "auto":
+        if distance > 10:
+            fare = distance * 12
+        elif 5 <= distance <= 10:
+            fare = distance * 10
+        else:
+            fare = distance * 9
+
+    elif vehicle_type == "car_city":
+        if distance <= 5:
+            fare = distance * 30
+        elif 6 <= distance <= 10:
+            fare = distance * 22
+        elif 10 <= distance <= 25:
+            fare = distance * 14
+        elif 25 <= distance <= 50:
+            fare = distance * 16  
+        else:  # 👈 added for > 50 km
+            fare = distance * 18  
+
+    elif vehicle_type == "tourism_car":
+        fare = distance * 15  
+
+    return fare
+
+        
+def calculate_incentives_and_rewards(distance):
+    driver_incentive = 0
+    customer_reward = {}
+
+    # Driver incentives
+    if distance > 10:
+        driver_incentive += 15
+    if 50 <= distance <= 100:
+        driver_incentive += 50
+    elif 100 <= distance <= 200:
+        driver_incentive += 100  
+
+    
+    if distance > 10:
+        customer_reward = {"cashback": 5, "water_bottles": 1}
+    if 6 <= distance <= 10:
+        customer_reward = {"cashback": 8}
+    if 40 <= distance <= 50:
+        customer_reward = {"water_bottles": 2, "tea": 1}
+    if 50 <= distance <= 100:
+        customer_reward = {"discount": "10% restaurant", "water_bottles": 3, "tea": 1}
+    if distance > 200:
+        customer_reward = {"discount": "10% restaurant", "water_bottles": 5, "tea": 1}
+
+    return driver_incentive, customer_reward
+        
+class CancelRideView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, ride_id):
+        try:
+            ride = get_object_or_404(Ride, id=ride_id)
+
+            # Prevent cancelling completed or already cancelled rides
+            if ride.status in ['completed', 'cancelled']:
+                return Response({
+                    "statusCode": "0",
+                    "statusMessage": f"Ride cannot be cancelled because it is {ride.status}."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Only rider (user) or driver assigned can cancel
+            if ride.user != request.user and ride.driver != request.user:
+                return Response({
+                    "statusCode": "0",
+                    "statusMessage": "You are not authorized to cancel this ride."
+                }, status=status.HTTP_403_FORBIDDEN)
+
+            # Update ride status
+            ride.status = 'cancelled'
+            ride.save(update_fields=["status"])
+
+            # Notify other party (optional, if Notification model exists)
+            if hasattr(models, "Notification"):
+                if request.user == ride.user and ride.driver:
+                    Notification.objects.create(
+                        user=ride.driver,
+                        title='Ride Cancelled',
+                        message=f'Ride {ride.id} has been cancelled by {ride.user.username}.'
+                    )
+                elif request.user == ride.driver:
+                    Notification.objects.create(
+                        user=ride.user,
+                        title='Ride Cancelled',
+                        message=f'Your ride {ride.id} was cancelled by driver {ride.driver.username}.'
+                    )
+
+            serializer = RideSerializer(ride)
+            return Response({
+                "statusCode": "1",
+                "statusMessage": "Ride cancelled successfully.",
+                "ride": serializer.data
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                "statusCode": "0",
+                "statusMessage": f"Error cancelling ride: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)      
+            
+            
+              

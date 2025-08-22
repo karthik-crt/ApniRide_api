@@ -17,7 +17,9 @@ urlpatterns = [
     path('rides/<int:ride_id>/status/', RideStatusUpdateView.as_view()),
     path('rides/reject/<int:ride_id>/', RejectRideView.as_view()),
     path('rides/feedback/<int:ride_id>/', SubmitRideFeedbackView.as_view()),
-
+    path("rides/<int:ride_id>/cancel/", CancelRideView.as_view()),
+    
+    #Location
     path('location/update/', DriverLocationUpdate.as_view()),
     path('location/<int:driver_id>/', GetDriverLocation.as_view()),
 
@@ -31,10 +33,14 @@ urlpatterns = [
     # changed
     path('admin/drivers/<int:driver_id>/approve/', AdminDriverApprovalView.as_view()),
     # 
-    path('rides/', AdminRideListView.as_view()),
+    path('rides', AdminRideListView.as_view()),
     path('payments/', AdminPaymentListView.as_view()),
     path('drivers/location/<int:driver_id>/', AdminDriverLocationView.as_view()),
     path('notifications/send/', AdminSendNotificationView.as_view()),
+    
+    
+    #Dashboard
+    path('adminDashboard',AdminDashboardView.as_view()),
     
     # Mobile
     path('userLogin',UserLoginView.as_view()),

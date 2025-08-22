@@ -16,10 +16,26 @@ class UserRegisterSerializer(serializers.ModelSerializer):
         return User.objects.create_user(**validated_data)
 
 class RideSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+    driver_name = serializers.CharField(source="driver.username", read_only=True)
+
     class Meta:
         model = Ride
         fields = '__all__'
-        read_only_fields = ['user','driver','status','fare','completed','paid','created_at','completed_at']
+        read_only_fields = [
+            'user','driver','status','fare','completed',
+            'paid','created_at','completed_at'
+        ]
+        # Add the extra fields to output
+        extra_fields = ['username', 'driver_name']
+
+    def to_representation(self, instance):
+        # include both default + extra fields
+        rep = super().to_representation(instance)
+        rep['username'] = instance.user.username if instance.user else None
+        rep['driver_name'] = instance.driver.username if instance.driver else None
+        return rep
+
 
 class DriverLocationSerializer(serializers.ModelSerializer):
     class Meta:
@@ -50,3 +66,31 @@ class RideFeedbackSerializer(serializers.ModelSerializer):
         if value < 1 or value > 5:
             raise serializers.ValidationError("Rating must be between 1 and 5.")
         return value
+
+class UserEditSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = "__all__"
+        extra_kwargs = {
+            "username": {"validators": []}  
+        }
+
+class AdminRideSerializer(serializers.ModelSerializer):
+    userName = serializers.CharField(source='user.username', read_only=True)
+    driverName = serializers.CharField(source='driver.username', read_only=True)
+    rejectedByIds = serializers.PrimaryKeyRelatedField(many=True, source='rejected_by', read_only=True)
+
+    class Meta:
+        model = Ride
+        fields = [
+            'id', 'pickup', 'drop', 'fare', 'status', 'completed', 'paid',
+            'created_at', 'completed_at', 'rating', 'feedback', 'user', 'driver',
+            'userName', 'driverName', 'rejectedByIds'
+        ]    
+
+class DriverPingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DriverLocation
+        fields = ["latitude", "longitude"]
+        
+    
