@@ -787,41 +787,70 @@ class AdminDashboardView(APIView):
             "rides": ride_data
         }
 
+
+from rest_framework import viewsets
+from .models import FareRule
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import FareRule
+from .serializers import FareRuleSerializer
+
+# List all rules or create a new one
+class FareRuleListView(APIView):
+    def get(self, request):
+        rules = FareRule.objects.all().order_by('vehicle_type', 'min_distance')
+        serializer = FareRuleSerializer(rules, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = FareRuleSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Retrieve, update, or delete a specific rule
+class FareRuleDetailView(APIView):
+    def get_object(self, pk):
+        return FareRule.objects.get(pk=pk)
+
+    def get(self, request, pk):
+        rule = self.get_object(pk)
+        serializer = FareRuleSerializer(rule)
+        return Response(serializer.data)
+
+    def put(self, request, pk):
+        rule = self.get_object(pk)
+        serializer = FareRuleSerializer(rule, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        rule = self.get_object(pk)
+        rule.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class FareRuleViewSet(viewsets.ModelViewSet):
+    queryset = FareRule.objects.all()
+    serializer_class = serializers.FareRuleSerializer
         
 def calculate_fare(vehicle_type, distance):
-    fare = 0
-    if vehicle_type == "bike":
-        if distance > 10:
-            fare = distance * 10
-        elif 5 <= distance <= 10:
-            fare = distance * 9
-        else:
-            fare = distance * 8
+    from .models import FareRule
+    
+    rules = FareRule.objects.filter(vehicle_type=vehicle_type).order_by("min_distance")
 
-    elif vehicle_type == "auto":
-        if distance > 10:
-            fare = distance * 12
-        elif 5 <= distance <= 10:
-            fare = distance * 10
-        else:
-            fare = distance * 9
+    for rule in rules:
+        if rule.max_distance is None:  # "Above"
+            if distance >= rule.min_distance:
+                return distance * rule.per_km_rate
+        elif rule.min_distance <= distance <= rule.max_distance:
+            return distance * rule.per_km_rate
 
-    elif vehicle_type == "car_city":
-        if distance <= 5:
-            fare = distance * 30
-        elif 6 <= distance <= 10:
-            fare = distance * 22
-        elif 10 <= distance <= 25:
-            fare = distance * 14
-        elif 25 <= distance <= 50:
-            fare = distance * 16  
-        else:  # 👈 added for > 50 km
-            fare = distance * 18  
-
-    elif vehicle_type == "tourism_car":
-        fare = distance * 15  
-
-    return fare
+    return 0  # fallback if no rule matched
 
         
 def calculate_incentives_and_rewards(distance):
@@ -903,5 +932,108 @@ class CancelRideView(APIView):
                 "statusMessage": f"Error cancelling ride: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)      
             
+
+from django.contrib import admin
+from .models import DistanceReward, TourismOffer
+
+@admin.register(DistanceReward)
+class DistanceRewardAdmin(admin.ModelAdmin):
+    list_display = ("min_distance", "max_distance", "cashback", "water_bottles", "tea", "discount")
+    list_editable = ("cashback", "water_bottles", "tea", "discount")
+
+@admin.register(TourismOffer)
+class TourismOfferAdmin(admin.ModelAdmin):
+    list_display = ("name", "discount", "tea", "water_bottles", "long_term_days")
+    list_editable = ("discount", "tea", "water_bottles", "long_term_days")
             
-              
+
+def calculate_customer_rewards(distance):
+    from .models import DistanceReward
+
+    # Fetch all rewards from DB
+    rewards = DistanceReward.objects.all()
+    applicable_reward = {}
+
+    for reward in rewards:
+        max_dist = reward.max_distance if reward.max_distance is not None else float('inf')
+        if reward.min_distance <= distance <= max_dist:
+            applicable_reward = {
+                "cashback": reward.cashback,
+                "water_bottles": reward.water_bottles,
+                "tea": reward.tea,
+                "discount": reward.discount
+            }
+            break
+
+    return applicable_reward
+
+# views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import DistanceReward, TourismOffer
+from .serializers import DistanceRewardSerializer, TourismOfferSerializer
+from django.shortcuts import get_object_or_404
+
+# DistanceReward API
+class DistanceRewardAPIView(APIView):
+    def get(self, request, pk=None):
+        if pk:
+            reward = get_object_or_404(DistanceReward, pk=pk)
+            serializer = DistanceRewardSerializer(reward)
+        else:
+            rewards = DistanceReward.objects.all().order_by("min_distance")
+            serializer = DistanceRewardSerializer(rewards, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = DistanceRewardSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, pk):
+        reward = get_object_or_404(DistanceReward, pk=pk)
+        serializer = DistanceRewardSerializer(reward, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        reward = get_object_or_404(DistanceReward, pk=pk)
+        reward.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# TourismOffer API
+class TourismOfferAPIView(APIView):
+    def get(self, request, pk=None):
+        if pk:
+            offer = get_object_or_404(TourismOffer, pk=pk)
+            serializer = TourismOfferSerializer(offer)
+        else:
+            offers = TourismOffer.objects.all()
+            serializer = TourismOfferSerializer(offers, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        serializer = TourismOfferSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, pk):
+        offer = get_object_or_404(TourismOffer, pk=pk)
+        serializer = TourismOfferSerializer(offer, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        offer = get_object_or_404(TourismOffer, pk=pk)
+        offer.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

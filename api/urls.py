@@ -38,6 +38,16 @@ urlpatterns = [
     path('drivers/location/<int:driver_id>/', AdminDriverLocationView.as_view()),
     path('notifications/send/', AdminSendNotificationView.as_view()),
     
+    # Fare Rules manually
+    path('fare-rules/', FareRuleListView.as_view()),              # GET all rules, POST new rule
+    path('fare-rules/<int:pk>/', FareRuleDetailView.as_view()),   # GET one rule, PUT update, DELETE
+
+    #distance reward
+    path('distance-rewards/', DistanceRewardAPIView.as_view()),
+    path('distance-rewards/<int:pk>/', DistanceRewardAPIView.as_view()),
+    #User offer
+    path('tourism-offers/', TourismOfferAPIView.as_view()),
+    path('tourism-offers/<int:pk>/', TourismOfferAPIView.as_view()),
     
     #Dashboard
     path('adminDashboard',AdminDashboardView.as_view()),

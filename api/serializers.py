@@ -92,5 +92,27 @@ class DriverPingSerializer(serializers.ModelSerializer):
     class Meta:
         model = DriverLocation
         fields = ["latitude", "longitude"]
+
+from rest_framework import serializers
+from .models import FareRule
+
+class FareRuleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FareRule
+        fields = "__all__"
         
+
+# serializers.py
+from rest_framework import serializers
+from .models import DistanceReward, TourismOffer
+
+class DistanceRewardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DistanceReward
+        fields = "__all__"
+
+class TourismOfferSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TourismOffer
+        fields = "__all__"
     

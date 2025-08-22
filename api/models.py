@@ -98,4 +98,50 @@ class Notification(models.Model):
     def __str__(self):
         return f"{self.title} -> {self.user.username}"
 
+class FareRule(models.Model):
+    VEHICLE_TYPES = [
+        ("bike", "Bike"),
+        ("auto", "Auto"),
+        ("car_city", "City Car"),
+        ("tourism_car", "Tourism Car"),
+    ]
 
+    vehicle_type = models.CharField(max_length=20, choices=VEHICLE_TYPES)
+    min_distance = models.FloatField(default=0)   # e.g. 0, 5, 10
+    max_distance = models.FloatField(null=True, blank=True)  # None = "Above"
+    per_km_rate = models.FloatField()  # e.g. 8, 9, 10, etc.
+
+    def __str__(self):
+        if self.max_distance:
+            return f"{self.vehicle_type}: {self.min_distance}-{self.max_distance} km → ₹{self.per_km_rate}/km"
+        return f"{self.vehicle_type}: {self.min_distance}+ km → ₹{self.per_km_rate}/km"
+    
+# Reward based on distance
+class DistanceReward(models.Model):
+    vehicle_type = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        help_text="Enter vehicle type (admin can add new types dynamically)"
+    )
+    min_distance = models.FloatField()
+    max_distance = models.FloatField(null=True, blank=True)  # max_distance can be None for open-ended
+    cashback = models.FloatField(default=0)
+    water_bottles = models.IntegerField(default=0)
+    tea = models.IntegerField(default=0)
+    discount = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.min_distance}-{self.max_distance} km Reward"
+
+# Tourism special offers
+class TourismOffer(models.Model):
+    name = models.CharField(max_length=100)
+    discount = models.CharField(max_length=100, blank=True, null=True)
+    tea = models.IntegerField(default=0)
+    water_bottles = models.IntegerField(default=0)
+    long_term_days = models.IntegerField(default=0)  # For multi-day bookings
+
+    def __str__(self):
+        return self.name
+    
