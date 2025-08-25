@@ -1114,3 +1114,17 @@ class DriverIncentiveView(APIView):
             return Response({"message": "Incentive deleted successfully"}, status=status.HTTP_200_OK)
         except DriverIncentive.DoesNotExist:
             return Response({"error": "Incentive not found"}, status=status.HTTP_404_NOT_FOUND)
+
+def getApiKey():
+    settings = IntegrationSettings.objects.first()
+    if settings:
+        return {
+            "maps_api_key": settings.maps_api_key,
+            "sms_api_key": settings.sms_api_key,
+            "payment_api_key": settings.payment_api_key
+        }
+    return {
+        "maps_api_key": None,
+        "sms_api_key": None,
+        "payment_api_key": None
+    }        
