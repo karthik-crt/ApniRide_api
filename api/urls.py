@@ -51,7 +51,8 @@ urlpatterns = [
     
     #Dashboard
     path('adminDashboard',AdminDashboardView.as_view()),
-    
+    #settings
+    path("settings/", IntegrationSettingsView.as_view()),
     # Mobile
     path('userLogin',UserLoginView.as_view()),
     path('userRegister',UserRegisterView.as_view()),

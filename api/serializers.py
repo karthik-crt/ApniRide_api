@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Ride, DriverLocation, Payment, OTP
+from .models import User, Ride, DriverLocation, Payment, OTP,IntegrationSettings
 
 
 class UserLoginSerializer(serializers.ModelSerializer):
@@ -116,3 +116,7 @@ class TourismOfferSerializer(serializers.ModelSerializer):
         model = TourismOffer
         fields = "__all__"
     
+class IntegrationSettingsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = IntegrationSettings
+        fields = ["id", "maps_api_key", "sms_api_key", "payment_api_key", "updated_at"]    

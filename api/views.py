@@ -821,13 +821,14 @@ class FareRuleDetailView(APIView):
         serializer = FareRuleSerializer(rule)
         return Response(serializer.data)
 
-    def put(self, request, pk):
+    def patch(self, request, pk):
         rule = self.get_object(pk)
         serializer = FareRuleSerializer(rule, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
     def delete(self, request, pk):
         rule = self.get_object(pk)
@@ -993,13 +994,14 @@ class DistanceRewardAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request, pk):
+    def patch(self, request, pk):
         reward = get_object_or_404(DistanceReward, pk=pk)
-        serializer = DistanceRewardSerializer(reward, data=request.data)
+        serializer = DistanceRewardSerializer(reward, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
     def delete(self, request, pk):
         reward = get_object_or_404(DistanceReward, pk=pk)
@@ -1025,15 +1027,34 @@ class TourismOfferAPIView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def put(self, request, pk):
+    def patch(self, request, pk):
         offer = get_object_or_404(TourismOffer, pk=pk)
-        serializer = TourismOfferSerializer(offer, data=request.data)
+        serializer = TourismOfferSerializer(offer, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
     def delete(self, request, pk):
         offer = get_object_or_404(TourismOffer, pk=pk)
         offer.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class IntegrationSettingsView(APIView):
+
+    def get(self, request):
+        settings, created = IntegrationSettings.objects.get_or_create(id=1)
+        serializer = IntegrationSettingsSerializer(settings)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        settings, created = IntegrationSettings.objects.get_or_create(id=1)
+        serializer = IntegrationSettingsSerializer(settings, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "Settings updated successfully", "data": serializer.data},
+                status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
