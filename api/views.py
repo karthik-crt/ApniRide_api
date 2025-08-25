@@ -1058,3 +1058,59 @@ class IntegrationSettingsView(APIView):
                 status=status.HTTP_200_OK
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class DriverIncentiveView(APIView):
+
+    def get(self, request, driver_id=None):
+        if driver_id:
+            # Fetch incentives for a particular driver
+            records = DriverIncentive.objects.filter(driver_id=driver_id)
+        else:
+            # Fetch all incentives (global + drivers)
+            records = DriverIncentive.objects.all()
+
+        serializer = DriverIncentiveSerializer(records, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, driver_id=None):
+        if driver_id:
+            # Update/create incentive for specific driver
+            record, created = DriverIncentive.objects.get_or_create(
+                driver_id=driver_id,
+                ride_type=request.data.get("ride_type"),
+                defaults={
+                    "distance": request.data.get("distance"),
+                    "days": request.data.get("days"),
+                    "driver_incentive": request.data.get("driver_incentive", 0),
+                    "details": request.data.get("details", "")
+                }
+            )
+        else:
+            # Global incentive
+            record, created = DriverIncentive.objects.get_or_create(
+                driver=None,
+                ride_type=request.data.get("ride_type"),
+                defaults={
+                    "distance": request.data.get("distance"),
+                    "days": request.data.get("days"),
+                    "driver_incentive": request.data.get("driver_incentive", 0),
+                    "details": request.data.get("details", "")
+                }
+            )
+
+        serializer = DriverIncentiveSerializer(record, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"message": "Incentive updated successfully", "data": serializer.data},
+                status=status.HTTP_200_OK
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    def delete(self, request, pk):
+        try:
+            record = DriverIncentive.objects.get(pk=pk)
+            record.delete()
+            return Response({"message": "Incentive deleted successfully"}, status=status.HTTP_200_OK)
+        except DriverIncentive.DoesNotExist:
+            return Response({"error": "Incentive not found"}, status=status.HTTP_404_NOT_FOUND)

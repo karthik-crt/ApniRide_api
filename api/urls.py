@@ -53,6 +53,10 @@ urlpatterns = [
     path('adminDashboard',AdminDashboardView.as_view()),
     #settings
     path("settings/", IntegrationSettingsView.as_view()),
+    #driver incentive
+    path("driver-incentive/", DriverIncentiveView.as_view()),
+    path("driver-incentive/<int:driver_id>/", DriverIncentiveView.as_view()),
+    path("incentives/<int:pk>/", DriverIncentiveView.as_view()),
     # Mobile
     path('userLogin',UserLoginView.as_view()),
     path('userRegister',UserRegisterView.as_view()),

@@ -104,7 +104,7 @@ class FareRuleSerializer(serializers.ModelSerializer):
 
 # serializers.py
 from rest_framework import serializers
-from .models import DistanceReward, TourismOffer
+from .models import DistanceReward, TourismOffer,DriverIncentive
 
 class DistanceRewardSerializer(serializers.ModelSerializer):
     class Meta:
@@ -120,3 +120,8 @@ class IntegrationSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = IntegrationSettings
         fields = ["id", "maps_api_key", "sms_api_key", "payment_api_key", "updated_at"]    
+        
+class DriverIncentiveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DriverIncentive
+        fields = "__all__"        
