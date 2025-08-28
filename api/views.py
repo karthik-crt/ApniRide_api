@@ -1276,3 +1276,8 @@ class IssueRefundView(APIView):
                 "statusCode": "0",
                 "statusMessage": f"Error issuing refund: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class VehicleTypeViewSet(viewsets.ModelViewSet):  
+    permission_classes = [permissions.IsAdminUser]
+    queryset = VehicleType.objects.all().order_by("-created_at")
+    serializer_class = VehicleTypeSerializer            

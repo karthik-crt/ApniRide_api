@@ -1,8 +1,12 @@
-from django.urls import path
+from django.urls import path,include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from .views import *
 from django.conf import settings
 from django.conf.urls.static import static
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'vehicle-types', VehicleTypeViewSet, basename='vehicle-type')
 urlpatterns = [
     path('register/', RegisterView.as_view()),
     path('login/', LoginView.as_view()),
@@ -22,7 +26,10 @@ urlpatterns = [
     #Location
     path('location/update/', DriverLocationUpdate.as_view()),
     path('location/<int:driver_id>/', GetDriverLocation.as_view()),
-
+    
+    #Add vechical
+    path('', include(router.urls)),
+    
     path('payments/initiate/<int:ride_id>/', CreatePaymentView.as_view()),
     path('payments/confirm/', ConfirmPaymentView.as_view()),
     

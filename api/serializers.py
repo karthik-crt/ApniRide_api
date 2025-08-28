@@ -126,7 +126,7 @@ class DriverIncentiveSerializer(serializers.ModelSerializer):
         model = DriverIncentive
         fields = "__all__"        
 
-from .models import Payment, RefundRequest
+from .models import Payment, RefundRequest,VehicleType
 
 class PaymentSerializer(serializers.ModelSerializer):
     rideId = serializers.CharField(source='ride.id', read_only=True)
@@ -152,3 +152,8 @@ class RefundRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = RefundRequest
         fields = ['id', 'rideId', 'userId', 'refund_amount', 'reason', 'status', 'requested_at']
+        
+class VehicleTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = VehicleType
+        fields = "__all__"        
