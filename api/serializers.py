@@ -125,3 +125,30 @@ class DriverIncentiveSerializer(serializers.ModelSerializer):
     class Meta:
         model = DriverIncentive
         fields = "__all__"        
+
+from .models import Payment, RefundRequest
+
+class PaymentSerializer(serializers.ModelSerializer):
+    rideId = serializers.CharField(source='ride.id', read_only=True)
+    userId = serializers.CharField(source='user.id', read_only=True)
+    amount = serializers.FloatField(source='ride.fare', read_only=True)
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Payment
+        fields = ['id', 'rideId', 'userId', 'amount', 'method', 'status', 'created_at']
+
+    def get_status(self, obj):
+        if obj.paid:
+            return 'completed'
+        elif obj.razorpay_payment_id:
+            return 'pending'
+        return 'failed'
+
+class RefundRequestSerializer(serializers.ModelSerializer):
+    rideId = serializers.CharField(source='ride.id', read_only=True)
+    userId = serializers.CharField(source='user.id', read_only=True)
+
+    class Meta:
+        model = RefundRequest
+        fields = ['id', 'rideId', 'userId', 'refund_amount', 'reason', 'status', 'requested_at']

@@ -202,6 +202,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import DriverLocation
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
 class DriverLocationUpdate(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -210,14 +213,12 @@ class DriverLocationUpdate(APIView):
             latitude = request.data.get('latitude')
             longitude = request.data.get('longitude')
 
-            # Validate presence
             if latitude is None or longitude is None:
                 return Response(
                     {"statusCode": "0", "statusMessage": "Latitude and longitude are required"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Validate numeric
             try:
                 latitude = float(latitude)
                 longitude = float(longitude)
@@ -227,22 +228,46 @@ class DriverLocationUpdate(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Pass defaults to avoid NULL error
+            # Save to DB
             loc, created = DriverLocation.objects.get_or_create(
                 driver=request.user,
                 defaults={'latitude': latitude, 'longitude': longitude}
             )
-
-            if not created:  # If it already existed, update it
+            if not created:
                 loc.latitude = latitude
                 loc.longitude = longitude
                 loc.save(update_fields=["latitude", "longitude"])
 
-            return Response(
-                {"statusCode": "1", "statusMessage": "Location updated successfully","driver": {
+            # 📡 Send location update to WebSocket group
+            channel_layer = get_channel_layer()
+            print("request.user.id",dir(request.user))
+            print("request.user.is_driver",request.user.is_driver)
+            print("request.user.id og",request.user.id)
+            
+            
+            async_to_sync(channel_layer.group_send)(
+                f"driver_{request.user.id}", 
+                {
+                    "type": "location_update",
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "driver": {
                         "id": request.user.id,
                         "username": request.user.username
-                    }},
+                    }
+                }
+            )
+            websocket_data = {
+                "type": "location.update",
+                "latitude": latitude,
+                "longitude": longitude,
+                "driver": {
+                    "id": request.user.id,
+                    "username": request.user.username
+                }
+            }
+            return Response(
+                {"statusCode": "1", "statusMessage": "Location updated successfully","driver":websocket_data},
                 status=status.HTTP_200_OK
             )
 
@@ -256,6 +281,15 @@ class DriverLocationUpdate(APIView):
 class GetDriverLocation(APIView):
     def get(self, request, driver_id):
         loc = DriverLocation.objects.get(driver_id=driver_id)
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"driver_{driver_id}",
+            {
+                "type": "location_update",
+                "latitude": loc.latitude,
+                "longitude": loc.longitude,
+            }
+        )
         return Response({"lat": loc.latitude, "lng": loc.longitude})
 
 class CreatePaymentView(APIView):
@@ -519,6 +553,11 @@ class UserRegisterView(APIView):
                 "statusMessage": "User already exists"
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        if User.objects.filter(email=email).exists():
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "email already exists"
+            }, status=status.HTTP_400_BAD_REQUEST)
         user = User.objects.create(
             mobile=mobile,
             username=username,
@@ -1128,3 +1167,112 @@ def getApiKey():
         "sms_api_key": None,
         "payment_api_key": None
     }        
+    
+    # views.py
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
+from django.db.models import Sum
+from .models import Payment, RefundRequest, Ride
+from .serializers import PaymentSerializer, RefundRequestSerializer
+from django.shortcuts import get_object_or_404
+
+class PaymentListView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        payments = Payment.objects.all().order_by('-created_at')
+        total_amount = payments.filter(paid=True).aggregate(total=Sum('ride__fare'))['total'] or 0
+        serializer = PaymentSerializer(payments, many=True)
+        return Response({
+            "statusCode": "1",
+            "statusMessage": "Payments retrieved successfully",
+            "totalAmount": total_amount,
+            "payments": serializer.data
+        })
+
+class AdjustFareView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, payment_id):
+        try:
+            payment = get_object_or_404(Payment, id=payment_id)
+            adjusted_amount = request.data.get('adjustedAmount')
+
+            if adjusted_amount is None or float(adjusted_amount) < 0:
+                return Response({
+                    "statusCode": "0",
+                    "statusMessage": "Invalid adjusted amount"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            payment.ride.fare = float(adjusted_amount)
+            payment.ride.save(update_fields=['fare'])
+
+            serializer = PaymentSerializer(payment)
+            return Response({
+                "statusCode": "1",
+                "statusMessage": "Fare adjusted successfully",
+                "payment": serializer.data
+            })
+
+        except Exception as e:
+            return Response({
+                "statusCode": "0",
+                "statusMessage": f"Error adjusting fare: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class RefundRequestListView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def get(self, request):
+        refund_requests = RefundRequest.objects.all().order_by('-requested_at')
+        serializer = RefundRequestSerializer(refund_requests, many=True)
+        return Response({
+            "statusCode": "1",
+            "statusMessage": "Refund requests retrieved successfully",
+            "refundRequests": serializer.data
+        })
+
+class IssueRefundView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, refund_id):
+        try:
+            refund_request = get_object_or_404(RefundRequest, id=refund_id)
+            issue_amount = request.data.get('issueAmount')
+
+            if issue_amount is None or float(issue_amount) <= 0:
+                return Response({
+                    "statusCode": "0",
+                    "statusMessage": "Invalid refund amount"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if refund_request.status != 'requested':
+                return Response({
+                    "statusCode": "0",
+                    "statusMessage": f"Refund cannot be issued because it is {refund_request.status}"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Update refund request
+            refund_request.refund_amount = float(issue_amount)
+            refund_request.status = 'approved'
+            refund_request.save(update_fields=['refund_amount', 'status'])
+
+            # Optionally update ride or payment status
+            payment = Payment.objects.filter(ride=refund_request.ride).first()
+            if payment:
+                payment.paid = False
+                payment.save(update_fields=['paid'])
+
+            serializer = RefundRequestSerializer(refund_request)
+            return Response({
+                "statusCode": "1",
+                "statusMessage": "Refund issued successfully",
+                "refund": serializer.data
+            })
+
+        except Exception as e:
+            return Response({
+                "statusCode": "0",
+                "statusMessage": f"Error issuing refund: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

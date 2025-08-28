@@ -70,14 +70,26 @@ class DriverLocation(models.Model):
     longitude = models.FloatField()
     updated_at = models.DateTimeField(auto_now=True)
 
+# models.py
 class Payment(models.Model):
+    PAYMENT_METHODS = [
+        ('UPI', 'UPI'),
+        ('Cash', 'Cash'),
+        ('Card', 'Card'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     ride = models.OneToOneField(Ride, on_delete=models.CASCADE)
     razorpay_order_id = models.CharField(max_length=255)
     razorpay_payment_id = models.CharField(max_length=255, blank=True, null=True)
     razorpay_signature = models.CharField(max_length=255, blank=True, null=True)
+    method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='UPI')
     paid = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Payment for Ride {self.ride.id} - {self.user.username}"
+    
     
 class OTP(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -172,3 +184,20 @@ class DriverIncentive(models.Model):
         if self.driver:
             return f"Incentive for {self.driver} ({self.ride_type})"
         return f"Global Incentive ({self.ride_type})"
+class RefundRequest(models.Model):
+    STATUS_CHOICES = [
+        ('requested', 'Requested'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    ride = models.ForeignKey(Ride, on_delete=models.CASCADE, related_name='refund_requests')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refund_requests')
+    refund_amount = models.FloatField()
+    reason = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='requested')
+    requested_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Refund {self.id} for Ride {self.ride.id} - {self.status}"

@@ -35,12 +35,16 @@ urlpatterns = [
     # 
     path('rides', AdminRideListView.as_view()),
     path('payments/', AdminPaymentListView.as_view()),
+    path('payments', PaymentListView.as_view(), name='payment-list'),
+    path('payments/<int:payment_id>/adjust/', AdjustFareView.as_view(), name='adjust-fare'),
+    path('refund-requests/', RefundRequestListView.as_view(), name='refund-request-list'),
+    path('refund-requests/<int:refund_id>/issue/', IssueRefundView.as_view(), name='issue-refund'),
     path('drivers/location/<int:driver_id>/', AdminDriverLocationView.as_view()),
     path('notifications/send/', AdminSendNotificationView.as_view()),
     
     # Fare Rules manually
-    path('fare-rules/', FareRuleListView.as_view()),              # GET all rules, POST new rule
-    path('fare-rules/<int:pk>/', FareRuleDetailView.as_view()),   # GET one rule, PUT update, DELETE
+    path('fare-rules/', FareRuleListView.as_view()),              
+    path('fare-rules/<int:pk>/', FareRuleDetailView.as_view()),   
 
     #distance reward
     path('distance-rewards/', DistanceRewardAPIView.as_view()),
