@@ -35,19 +35,12 @@ class Ride(models.Model):
         ('completed', 'Completed'),
         ('rejected', 'Rejected'),
     ]
-
-    VEHICLE_CHOICES = [
-        ('bike', 'Bike'),
-        ('auto', 'Auto'),
-        ('car_city', 'Car (City)'),
-        ('tourism_car', 'Tourism Car'),
-    ]
     user = models.ForeignKey(User, related_name='rides', on_delete=models.CASCADE)
     driver = models.ForeignKey(User, related_name='assigned_rides', null=True, blank=True, on_delete=models.SET_NULL)
     pickup = models.CharField(max_length=255)
     drop = models.CharField(max_length=255)
     distance_km = models.FloatField(default=0)  
-    vehicle_type = models.CharField(max_length=20, choices=VEHICLE_CHOICES, default='car_city')
+    vehicle_type = models.CharField(max_length=20,default='Car')
     fare = models.FloatField(default=0)  
     driver_incentive = models.FloatField(default=0)  
     customer_reward = models.JSONField(default=dict, blank=True) 
@@ -111,14 +104,7 @@ class Notification(models.Model):
         return f"{self.title} -> {self.user.username}"
 
 class FareRule(models.Model):
-    VEHICLE_TYPES = [
-        ("bike", "Bike"),
-        ("auto", "Auto"),
-        ("car_city", "City Car"),
-        ("tourism_car", "Tourism Car"),
-    ]
-
-    vehicle_type = models.CharField(max_length=20, choices=VEHICLE_TYPES)
+    vehicle_type = models.CharField(max_length=50)
     min_distance = models.FloatField(default=0)   # e.g. 0, 5, 10
     max_distance = models.FloatField(null=True, blank=True)  # None = "Above"
     per_km_rate = models.FloatField()  # e.g. 8, 9, 10, etc.

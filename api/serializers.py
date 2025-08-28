@@ -156,4 +156,31 @@ class RefundRequestSerializer(serializers.ModelSerializer):
 class VehicleTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = VehicleType
-        fields = "__all__"        
+        fields = "__all__"  
+        
+        
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = ['method', 'paid', 'created_at', 'razorpay_payment_id']
+
+class RefundRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RefundRequest
+        fields = ['refund_amount', 'reason', 'status', 'requested_at']
+
+class RideHistorySerializer(serializers.ModelSerializer):
+    payment = PaymentSerializer(read_only=True)
+    refund_requests = RefundRequestSerializer(many=True, read_only=True)
+    driver_name = serializers.CharField(source='driver.username', default=None)
+    user_name = serializers.CharField(source='user.username')
+
+    class Meta:
+        model = Ride
+        fields = [
+            'id', 'pickup', 'drop', 'distance_km', 'vehicle_type',
+            'fare', 'driver_incentive', 'customer_reward', 'status',
+            'completed', 'paid', 'created_at', 'completed_at',
+            'rating', 'feedback', 'driver_name', 'user_name',
+            'payment', 'refund_requests'
+        ]      

@@ -23,6 +23,11 @@ urlpatterns = [
     path('rides/feedback/<int:ride_id>/', SubmitRideFeedbackView.as_view()),
     path("rides/<int:ride_id>/cancel/", CancelRideView.as_view()),
     
+    # History
+    path('admin/booking-history/', AdminBookingHistoryView.as_view(), name='admin-booking-history'),
+    path('user/booking-history/', UserBookingHistoryView.as_view(), name='user-booking-history'),
+    path('driver/ride-history/', DriverRideHistoryView.as_view(), name='driver-ride-history'),
+    
     #Location
     path('location/update/', DriverLocationUpdate.as_view()),
     path('location/<int:driver_id>/', GetDriverLocation.as_view()),

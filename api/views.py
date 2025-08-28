@@ -174,10 +174,46 @@ class BookRideView(generics.CreateAPIView):
 class RideHistoryView(generics.ListAPIView):
     serializer_class = RideSerializer
     permission_classes = [permissions.IsAuthenticated]
+
     def get_queryset(self):
-        if self.request.user.is_driver:
-            return Ride.objects.filter(driver=self.request.user)
-        return Ride.objects.filter(user=self.request.user)
+        user = self.request.user
+        qs = Ride.objects.none()
+
+        if bool(user.is_driver):
+            qs = Ride.objects.filter(driver=user)
+        else:
+            qs = Ride.objects.filter(user=user)
+
+        # Optional: filter by status
+        status = self.request.query_params.get('status')
+        if status:
+            qs = qs.filter(status=status)
+
+        return qs.order_by('-created_at')
+    
+class AdminBookingHistoryView(generics.ListAPIView):
+    serializer_class = RideHistorySerializer
+    permission_classes = [permissions.IsAdminUser]  
+
+    def get_queryset(self):
+        print("AdminBookingHistoryView called")
+        return Ride.objects.all().order_by('-created_at')  
+class UserBookingHistoryView(generics.ListAPIView):
+    serializer_class = RideHistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Ride.objects.filter(user=self.request.user).order_by('-created_at')    
+    
+class DriverRideHistoryView(generics.ListAPIView):
+    serializer_class = RideHistorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not bool(user.is_driver):
+            return Ride.objects.none()  # non-drivers see nothing
+        return Ride.objects.filter(driver=user).order_by('-created_at')      
 
 class AvailableRidesView(generics.ListAPIView):
     serializer_class = RideSerializer
@@ -710,6 +746,7 @@ class RideStatusUpdateView(APIView):
                     "statusMessage": "You are not authorized to complete this ride."
                 }, status=status.HTTP_403_FORBIDDEN)
             ride.status = 'completed'
+            ride.completed = True
 
         elif new_status == 'cancelled':
             # Add your cancellation logic, e.g. who can cancel and when
@@ -893,29 +930,32 @@ def calculate_fare(vehicle_type, distance):
     return 0  # fallback if no rule matched
 
         
-def calculate_incentives_and_rewards(distance):
+from django.db.models import Q
+
+def calculate_incentives_and_rewards(distance, vehicle_type=None):
     driver_incentive = 0
     customer_reward = {}
 
-    # Driver incentives
-    if distance > 10:
-        driver_incentive += 15
-    if 50 <= distance <= 100:
-        driver_incentive += 50
-    elif 100 <= distance <= 200:
-        driver_incentive += 100  
+    # Filter DistanceReward table dynamically based on distance and vehicle type
+    rewards = DistanceReward.objects.filter(
+        Q(vehicle_type=vehicle_type) | Q(vehicle_type__isnull=True),
+        min_distance__lte=distance
+    ).order_by('min_distance')
 
-    
-    if distance > 10:
-        customer_reward = {"cashback": 5, "water_bottles": 1}
-    if 6 <= distance <= 10:
-        customer_reward = {"cashback": 8}
-    if 40 <= distance <= 50:
-        customer_reward = {"water_bottles": 2, "tea": 1}
-    if 50 <= distance <= 100:
-        customer_reward = {"discount": "10% restaurant", "water_bottles": 3, "tea": 1}
-    if distance > 200:
-        customer_reward = {"discount": "10% restaurant", "water_bottles": 5, "tea": 1}
+    for reward in rewards:
+        if reward.max_distance is None or distance <= reward.max_distance:
+            # Calculate customer reward
+            customer_reward = {
+                "cashback": reward.cashback,
+                "water_bottles": reward.water_bottles,
+                "tea": reward.tea,
+            }
+            if reward.discount:
+                customer_reward["discount"] = reward.discount
+
+            # Assume driver incentive is same as cashback * 2 for example
+            driver_incentive += reward.cashback * 2  # you can adjust this logic
+            break  # only take the first matching reward
 
     return driver_incentive, customer_reward
         
@@ -1278,6 +1318,6 @@ class IssueRefundView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VehicleTypeViewSet(viewsets.ModelViewSet):  
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
     queryset = VehicleType.objects.all().order_by("-created_at")
     serializer_class = VehicleTypeSerializer            
