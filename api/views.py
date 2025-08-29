@@ -1319,6 +1319,7 @@ class IssueRefundView(APIView):
 
 class VehicleTypeViewSet(viewsets.ModelViewSet):  
     permission_classes = [permissions.IsAdminUser]
+    parser_classes = [MultiPartParser, FormParser]
     queryset = VehicleType.objects.all().order_by("-created_at")
     serializer_class = VehicleTypeSerializer            
     
