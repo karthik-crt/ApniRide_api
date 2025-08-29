@@ -34,7 +34,9 @@ urlpatterns = [
     
     #Add vechical
     path('', include(router.urls)),
+    path('user/vehicle-types/', UserVehicleTypeView.as_view(), name='vehicle-type-list'),
     
+    # Payments
     path('payments/initiate/<int:ride_id>/', CreatePaymentView.as_view()),
     path('payments/confirm/', ConfirmPaymentView.as_view()),
     

@@ -123,7 +123,7 @@ class DistanceReward(models.Model):
         help_text="Enter vehicle type (admin can add new types dynamically)"
     )
     min_distance = models.FloatField()
-    max_distance = models.FloatField(null=True, blank=True)  # max_distance can be None for open-ended
+    max_distance = models.FloatField(null=True, blank=True)  
     cashback = models.FloatField(default=0)
     water_bottles = models.IntegerField(default=0)
     tea = models.IntegerField(default=0)
@@ -138,7 +138,7 @@ class TourismOffer(models.Model):
     discount = models.CharField(max_length=100, blank=True, null=True)
     tea = models.IntegerField(default=0)
     water_bottles = models.IntegerField(default=0)
-    long_term_days = models.IntegerField(default=0)  # For multi-day bookings
+    long_term_days = models.IntegerField(default=0)
 
     def __str__(self):
         return self.name
@@ -147,14 +147,13 @@ class IntegrationSettings(models.Model):
     maps_api_key = models.CharField(max_length=255, blank=True, null=True)
     sms_api_key = models.CharField(max_length=255, blank=True, null=True)
     payment_api_key = models.CharField(max_length=255, blank=True, null=True)
-
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return "Integration Settings"
 class DriverIncentive(models.Model):
     driver = models.ForeignKey(
-        settings.AUTH_USER_MODEL,  # or your custom Driver model
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         null=True, blank=True,
         related_name="incentives"

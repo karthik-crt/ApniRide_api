@@ -1318,6 +1318,18 @@ class IssueRefundView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class VehicleTypeViewSet(viewsets.ModelViewSet):  
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
     queryset = VehicleType.objects.all().order_by("-created_at")
     serializer_class = VehicleTypeSerializer            
+    
+class UserVehicleTypeView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        vehicle_types = VehicleType.objects.all().order_by('name')
+        serializer = VehicleTypeSerializer(vehicle_types, many=True)
+        return Response({
+            "statusCode": "1",
+            "statusMessage": "Vehicle types retrieved successfully",
+            "vehicleTypes": serializer.data
+        })    
