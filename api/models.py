@@ -22,6 +22,9 @@ class User(AbstractUser):
     model = models.CharField(max_length=50, null=True, blank=True)
     plate_number = models.CharField(max_length=20, null=True, blank=True)
     state = models.CharField(max_length=50, null=True, blank=True) 
+    is_online = models.BooleanField(default=False)
+    current_lat = models.FloatField(null=True, blank=True)
+    current_lng = models.FloatField(null=True, blank=True)
     approval_state = models.CharField(
         max_length=20,
         choices=APPROVAL_CHOICES,
@@ -39,9 +42,16 @@ class Ride(models.Model):
     driver = models.ForeignKey(User, related_name='assigned_rides', null=True, blank=True, on_delete=models.SET_NULL)
     pickup = models.CharField(max_length=255)
     drop = models.CharField(max_length=255)
+    pickup_lat = models.FloatField(null=True, blank=True)
+    pickup_lng = models.FloatField(null=True, blank=True)
+    drop_lat = models.FloatField(null=True, blank=True)
+    drop_lng = models.FloatField(null=True, blank=True)
+    pickup_mode = models.CharField(max_length=10, default="NOW", choices=[("NOW", "Ride Now"), ("LATER", "Ride Later")])
+    pickup_time = models.DateTimeField(default=timezone.now)
     distance_km = models.FloatField(default=0)  
     vehicle_type = models.CharField(max_length=20,default='Car')
     fare = models.FloatField(default=0)  
+    fare_estimate = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
     driver_incentive = models.FloatField(default=0)  
     customer_reward = models.JSONField(default=dict, blank=True) 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -49,6 +59,7 @@ class Ride(models.Model):
     paid = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    coupon_applied = models.CharField(max_length=20, null=True, blank=True)
     rating = models.IntegerField(null=True, blank=True)
     feedback = models.TextField(null=True, blank=True)
     rejected_by = models.ManyToManyField(User, related_name='rejected_rides', blank=True)
@@ -69,6 +80,7 @@ class Payment(models.Model):
         ('UPI', 'UPI'),
         ('Cash', 'Cash'),
         ('Card', 'Card'),
+        ("WALLET", "Wallet"),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -78,6 +90,7 @@ class Payment(models.Model):
     razorpay_signature = models.CharField(max_length=255, blank=True, null=True)
     method = models.CharField(max_length=20, choices=PAYMENT_METHODS, default='UPI')
     paid = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, default="PENDING")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -202,3 +215,25 @@ class VehicleType(models.Model):
 
     def __str__(self):
         return self.name    
+    
+class Coupon(models.Model):
+    """Coupon Model"""
+    code = models.CharField(max_length=20, unique=True)
+    description = models.TextField()
+    discount_percent = models.PositiveIntegerField(default=0)
+    max_discount = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    is_active = models.BooleanField(default=True)
+    expiry_date = models.DateTimeField()
+
+    def __str__(self):
+        return self.code    
+    
+class Commission(models.Model):
+    """Admin Commission from Driver"""
+    driver = models.ForeignKey(User, on_delete=models.CASCADE)
+    booking = models.OneToOneField(Ride, on_delete=models.CASCADE)
+    commission_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Commission-{self.booking.id}"    
