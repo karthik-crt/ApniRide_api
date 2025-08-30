@@ -1,3 +1,4 @@
+from django.forms import ValidationError
 from rest_framework.views import APIView
 from rest_framework import generics, permissions ,parsers
 from rest_framework.response import Response
@@ -454,7 +455,7 @@ class AdminUserDeleteView(generics.DestroyAPIView):
             "statusMessage": "Deleted successfully"
         }, status=status.HTTP_200_OK)
      
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 
 class AdminDriverApprovalView(APIView):
     permission_classes = [permissions.IsAdminUser]
@@ -788,7 +789,7 @@ class AdminDashboardView(APIView):
                 "totalUsers": User.objects.filter(is_user=True).count(),
                 "newUsersToday": User.objects.filter(is_user=True, date_joined__date=today).count(),
                 "totalDrivers": User.objects.filter(is_driver=True).count(),
-                "onlineDrivers": DriverLocation.objects.filter(updated_at__gte=timezone.now() - timedelta(minutes=15)).count(),
+                "onlineDrivers": User.objects.filter(is_online=True).count(),
                 "todayRides": Ride.objects.filter(created_at__date=today).count(),
                 "todayRevenue": Payment.objects.filter(paid=True, ride__created_at__date=today).aggregate(total=Sum('ride__fare'))['total'] or 0,
                 "avgRating": Ride.objects.filter(rating__isnull=False).aggregate(avg=Avg('rating'))['avg'] or 0
@@ -1334,3 +1335,40 @@ class UserVehicleTypeView(APIView):
             "statusMessage": "Vehicle types retrieved successfully",
             "vehicleTypes": serializer.data
         })    
+        
+class DriverOnlineStatusUpdateView(generics.UpdateAPIView):
+    serializer_class = UserOnlineStatusSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = User.objects.all()  # base queryset
+
+    def get_queryset(self):
+        # Only drivers can be updated
+        return User.objects.filter(is_driver=1,approval_state='approved')
+
+    def patch(self, request, *args, **kwargs):
+        driver = self.get_object()  # ensures object comes from filtered queryset
+        serializer = self.get_serializer(driver, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Driver online status updated successfully",
+                "is_online": serializer.data['is_online']
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UserProfilePatchView(APIView):
+    parser_classes = [MultiPartParser, FormParser]  
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, *args, **kwargs):
+        print("Request Data:", request.data)
+        user = request.user
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        serializer = UserSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)

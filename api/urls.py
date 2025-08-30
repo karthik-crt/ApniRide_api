@@ -22,12 +22,13 @@ urlpatterns = [
     path('rides/reject/<int:ride_id>/', RejectRideView.as_view()),
     path('rides/feedback/<int:ride_id>/', SubmitRideFeedbackView.as_view()),
     path("rides/<int:ride_id>/cancel/", CancelRideView.as_view()),
-    
+    # Driver
+    path('driver/<int:pk>/online-status/', DriverOnlineStatusUpdateView.as_view()),
     # History
     path('admin/booking-history/', AdminBookingHistoryView.as_view(), name='admin-booking-history'),
     path('user/booking-history/', UserBookingHistoryView.as_view(), name='user-booking-history'),
     path('driver/ride-history/', DriverRideHistoryView.as_view(), name='driver-ride-history'),
-    
+    path('profile/', UserProfilePatchView.as_view()),
     #Location
     path('location/update/', DriverLocationUpdate.as_view()),
     path('location/<int:driver_id>/', GetDriverLocation.as_view()),

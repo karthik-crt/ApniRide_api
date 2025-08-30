@@ -184,3 +184,13 @@ class RideHistorySerializer(serializers.ModelSerializer):
             'rating', 'feedback', 'driver_name', 'user_name',
             'payment', 'refund_requests'
         ]      
+        
+class UserOnlineStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['is_online']
+        
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['username', 'profile_photo', 'mobile', 'emergency_contact_number', 'preferred_payment_method']        

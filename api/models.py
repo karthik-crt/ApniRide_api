@@ -14,6 +14,8 @@ class User(AbstractUser):
     email = models.EmailField(unique=True)
     mobile = models.CharField(max_length=50, default='', blank=True, null=True)
     is_user = models.IntegerField(default=0, blank=True, null=True)
+    profile_photo = models.FileField(upload_to='profile_photos/', null=True, blank=True)
+    emergency_contact_number = models.CharField(max_length=15, null=True, blank=True)
     driving_license = models.FileField(upload_to='documents/driving_license/', null=True, blank=True)
     rc_book = models.FileField(upload_to='documents/rc_book/', null=True, blank=True)
     aadhaar = models.FileField(upload_to='documents/aadhaar/', null=True, blank=True)
@@ -25,6 +27,7 @@ class User(AbstractUser):
     is_online = models.BooleanField(default=False)
     current_lat = models.FloatField(null=True, blank=True)
     current_lng = models.FloatField(null=True, blank=True)
+    preferred_payment_method = models.CharField(max_length=50, default='', blank=True, null=True)
     approval_state = models.CharField(
         max_length=20,
         choices=APPROVAL_CHOICES,
