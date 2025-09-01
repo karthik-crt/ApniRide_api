@@ -80,5 +80,11 @@ urlpatterns = [
     path('userLogin',UserLoginView.as_view()),
     path('userRegister',UserRegisterView.as_view()),
     path('driver/register',DriverRegisterView.as_view()),
-    path('driver/login',DriverLoginView.as_view())
+    path('driver/login',DriverLoginView.as_view()),
+    
+    #block user
+    path("suspend/<int:pk>/", SuspendUserAPIView.as_view(), name="suspend_user"),
+    path("block/<int:pk>/", BlockUserAPIView.as_view(), name="block_user"),
+    path("activate/<int:pk>/", ActivateUserAPIView.as_view(), name="activate_user"),
+    
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

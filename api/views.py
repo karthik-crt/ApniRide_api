@@ -1014,19 +1014,7 @@ class CancelRideView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)      
             
 
-from django.contrib import admin
-from .models import DistanceReward, TourismOffer
-
-@admin.register(DistanceReward)
-class DistanceRewardAdmin(admin.ModelAdmin):
-    list_display = ("min_distance", "max_distance", "cashback", "water_bottles", "tea", "discount")
-    list_editable = ("cashback", "water_bottles", "tea", "discount")
-
-@admin.register(TourismOffer)
-class TourismOfferAdmin(admin.ModelAdmin):
-    list_display = ("name", "discount", "tea", "water_bottles", "long_term_days")
-    list_editable = ("discount", "tea", "water_bottles", "long_term_days")
-            
+          
 
 def calculate_customer_rewards(distance):
     from .models import DistanceReward
@@ -1373,3 +1361,74 @@ class UserProfilePatchView(APIView):
         user = request.user
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib import messages
+from django.views import View
+from django.shortcuts import get_object_or_404, redirect
+from django.http import JsonResponse
+import json
+from django.utils import timezone
+from datetime import timedelta
+class StaffRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        return self.request.user.is_staff or self.request.user.is_superuser
+    
+class SuspendUserAPIView(APIView):
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, pk):
+        minutes = int(request.data.get("minutes", 0))
+        hours = int(request.data.get("hours", 0))
+        days = int(request.data.get("days", 0))
+
+        total_duration = timedelta(days=days, hours=hours, minutes=minutes)
+
+        # Default to 7 days if nothing valid was provided
+        if total_duration.total_seconds() <= 0:
+            total_duration = timedelta(days=7)
+
+        user = get_object_or_404(User, pk=pk)
+
+        # Suspend user
+        user.account_status = "suspended"
+        user.suspended_until = timezone.now() + total_duration
+        user.save(update_fields=["account_status", "suspended_until"])
+
+        return Response({
+            "status": "success",
+            "message": f"{user.username} suspended until {user.suspended_until}",
+            "suspended_until": user.suspended_until,
+            "currently_suspended": user.is_suspended,  # auto-reactivates if expired
+        })
+
+
+class BlockUserAPIView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, pk):
+        user = get_object_or_404(User, pk=pk)
+        user.account_status = "blocked"
+        user.suspended_until = None
+        user.save()
+
+        return Response({
+            "status": "success",
+            "message": f"{user.username} has been blocked."
+        }, status=status.HTTP_200_OK)
+
+
+class ActivateUserAPIView(APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def post(self, request, pk):
+        user = get_object_or_404(User, pk=pk)
+        user.account_status = "active"
+        user.suspended_until = None
+        user.save()
+
+        return Response({
+            "status": "success",
+            "message": f"{user.username} is active again."
+        }, status=status.HTTP_200_OK)
+        

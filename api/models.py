@@ -33,6 +33,30 @@ class User(AbstractUser):
         choices=APPROVAL_CHOICES,
         default='pending'
     )
+    account_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('active', 'Active'),
+            ('suspended', 'Suspended'),
+            ('blocked', 'Blocked'),
+        ],
+        default='active'
+    )
+    suspended_until = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_suspended(self):
+        """Check if user is currently suspended and auto-reactivate if expired"""
+        if self.account_status == "suspended" and self.suspended_until:
+            if timezone.now() < self.suspended_until:
+                return True
+            else:
+                # Auto-reactivate once suspension period is over
+                self.account_status = "active"
+                self.suspended_until = None
+                self.save(update_fields=["account_status", "suspended_until"])
+                return False
+        return False
     
 class Ride(models.Model):
     STATUS_CHOICES = [
