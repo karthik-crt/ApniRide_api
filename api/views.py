@@ -327,7 +327,7 @@ class GetDriverLocation(APIView):
                 "longitude": loc.longitude,
             }
         )
-        return Response({"lat": loc.latitude, "lng": loc.longitude})
+        return Response({"StatusCode": 1,"lat": loc.latitude, "lng": loc.longitude})
 
 class CreatePaymentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -337,7 +337,7 @@ class CreatePaymentView(APIView):
             client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_SECRET))
             order = client.order.create({"amount": int(ride.fare * 100), "currency": "INR", "payment_capture": 1})
             Payment.objects.create(user=request.user, ride=ride, razorpay_order_id=order['id'])
-            return Response(order)
+            return Response({"StatusCode": 1,"data": order})
         except Exception as e:
             return Response({"statusCode":"0", "statusMessage": str(e)})
 
@@ -1351,7 +1351,8 @@ class DriverOnlineStatusUpdateView(generics.UpdateAPIView):
         if serializer.is_valid():
             serializer.save()
             return Response({
-                "message": "Driver online status updated successfully",
+                "StatusCode": 1,
+                "statusMessage": "Driver online status updated successfully",
                 "is_online": serializer.data['is_online']
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
