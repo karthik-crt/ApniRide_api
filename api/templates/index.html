@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AcmeCorp - Make a Purchase</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <h1>Make a Payment</h1>
+    <button id="rzp-button">Pay ₹5</button>
+
+    <script>
+        document.getElementById('rzp-button').onclick = function(e) {
+            // Step 1: Create an order
+            fetch('/order', { method: 'POST' })
+                .then(response => response.json())
+                .then(order => {
+                    // Step 2: Configure Razorpay options
+                    const options = {
+                        "key": "{{ key_id }}", // Razorpay key ID from backend
+                        "amount": order.amount, // Order amount in paise
+                        "currency": "INR",
+                        "name": "Your Company",
+                        "description": "Payment for order # " + order.order_id,
+                        "order_id": order.order_id, // Pass order_id from backend
+                        "callback_url": "/verify"
+                    };
+
+                    // Step 3: Open Razorpay Checkout
+                    const rzp = new Razorpay(options);
+                    rzp.open();
+                })
+                .catch(err => alert("Error creating order!"));
+        };
+    </script>
+</body>
+</html>

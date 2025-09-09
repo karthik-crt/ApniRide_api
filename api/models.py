@@ -28,6 +28,9 @@ class User(AbstractUser):
     current_lat = models.FloatField(null=True, blank=True)
     current_lng = models.FloatField(null=True, blank=True)
     preferred_payment_method = models.CharField(max_length=50, default='', blank=True, null=True)
+    is_available = models.BooleanField(default=True)  # For drivers: available for rides
+    fcm_token = models.TextField(null=True, blank=True)
+    last_location_update = models.DateTimeField(auto_now=True)
     approval_state = models.CharField(
         max_length=20,
         choices=APPROVAL_CHOICES,
@@ -67,13 +70,14 @@ class Ride(models.Model):
     ]
     user = models.ForeignKey(User, related_name='rides', on_delete=models.CASCADE)
     driver = models.ForeignKey(User, related_name='assigned_rides', null=True, blank=True, on_delete=models.SET_NULL)
+    booking_id = models.CharField(max_length=20, unique=True, null=True, blank=True)
     pickup = models.CharField(max_length=255)
     drop = models.CharField(max_length=255)
     pickup_lat = models.FloatField(null=True, blank=True)
     pickup_lng = models.FloatField(null=True, blank=True)
     drop_lat = models.FloatField(null=True, blank=True)
     drop_lng = models.FloatField(null=True, blank=True)
-    pickup_mode = models.CharField(max_length=10, default="NOW", choices=[("NOW", "Ride Now"), ("LATER", "Ride Later")])
+    pickup_mode = models.CharField(max_length=10, default="NOW", choices=[("NOW", "now"), ("LATER", "later")])
     pickup_time = models.DateTimeField(default=timezone.now)
     distance_km = models.FloatField(default=0)  
     vehicle_type = models.CharField(max_length=20,default='Car')
@@ -82,6 +86,7 @@ class Ride(models.Model):
     driver_incentive = models.FloatField(default=0)  
     customer_reward = models.JSONField(default=dict, blank=True) 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    assigned_driver = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='assigned_bookings')
     completed = models.BooleanField(default=False)
     paid = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -99,6 +104,7 @@ class DriverLocation(models.Model):
     driver = models.OneToOneField(User, on_delete=models.CASCADE, related_name='location')
     latitude = models.FloatField()
     longitude = models.FloatField()
+    fcm_token = models.TextField(null=True, blank=True)   # add this
     updated_at = models.DateTimeField(auto_now=True)
 
 # models.py
@@ -148,11 +154,42 @@ class FareRule(models.Model):
     min_distance = models.FloatField(default=0)   # e.g. 0, 5, 10
     max_distance = models.FloatField(null=True, blank=True)  # None = "Above"
     per_km_rate = models.FloatField()  # e.g. 8, 9, 10, etc.
-
+    gst_percentage = models.FloatField(default=0)  # e.g. 5, 12, 18
+    commission_percentage = models.FloatField(default=0)  # e.g. 10, 20
+    
     def __str__(self):
         if self.max_distance:
             return f"{self.vehicle_type}: {self.min_distance}-{self.max_distance} km → ₹{self.per_km_rate}/km"
         return f"{self.vehicle_type}: {self.min_distance}+ km → ₹{self.per_km_rate}/km"
+    
+    def calculate_fare(self, distance):
+        """
+        Calculate total fare (base fare + GST) for a given distance.
+        """
+        if self.max_distance is None or (self.min_distance <= distance <= self.max_distance):
+            base_fare = distance * self.per_km_rate
+            gst_amount = (base_fare * self.gst_percentage) / 100
+            return base_fare + gst_amount
+        return None
+    
+    def calculate_fare(self, distance):
+        """
+        Calculate total fare (base fare + GST + commission) for a given distance.
+        Returns a dict with breakdown.
+        """
+        if self.max_distance is None or (self.min_distance <= distance <= self.max_distance):
+            base_fare = distance * self.per_km_rate
+            gst_amount = (base_fare * self.gst_percentage) / 100
+            commission_amount = (base_fare * self.commission_percentage) / 100
+            total_fare = base_fare + gst_amount + commission_amount
+
+            return {
+                "base_fare": base_fare,
+                "gst_amount": gst_amount,
+                "commission_amount": commission_amount,
+                "total_fare": total_fare
+            }
+        return None
     
 # Reward based on distance
 class DistanceReward(models.Model):

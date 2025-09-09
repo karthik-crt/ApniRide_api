@@ -25,6 +25,18 @@ from django.db.models import Sum, Count, Avg
 from django.utils import timezone
 from datetime import timedelta
 import random
+
+import logging
+from django.contrib.auth import get_user_model
+from rest_framework.views import APIView
+from rest_framework import permissions, status
+from rest_framework.response import Response
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+from .models import DriverLocation  # Ensure this model exists
+
+logger = logging.getLogger(__name__)
+
 class RegisterView(generics.CreateAPIView):
     serializer_class = UserRegisterSerializer
     permission_classes = [permissions.AllowAny]
@@ -152,25 +164,124 @@ class VerifyOTPView(APIView):
         except Exception as e:
             return Response({"statusCode": "0", "statusMessage": str(e)})
 
-
+from rest_framework import generics, permissions, status
+from rest_framework.response import Response
+from rest_framework.serializers import ValidationError
+from django.utils import timezone
+from .utils import calculate_distance,get_nearby_driver_tokens,get_nearest_driver_distance
+from ApniRide.firebase_app import send_multicast
 class BookRideView(generics.CreateAPIView):
     serializer_class = RideSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
-        distance = float(self.request.data.get("distance_km"))
+        # Extract and validate mandatory fields
+        pickup_lat = self.request.data.get("pickup_lat")
+        pickup_lng = self.request.data.get("pickup_lng")
         vehicle_type = self.request.data.get("vehicle_type")
+        pickup_mode = self.request.data.get("pickup_mode")
+        print("self.request.data.get",self.request.data.get("pickup"))
+        print("self.request.data.get",self.request.data.get("drop"))
+        
+        # Optional fields
+        drop_lat = self.request.data.get("drop_lat")
+        drop_lng = self.request.data.get("drop_lng")
+        pickup_time = self.request.data.get("pickup_time")
+        booking_id = str(random.randint(1000, 9999))
+        # Validate coordinates
+        try:
+            pickup_lat = float(pickup_lat)
+            pickup_lng = float(pickup_lng)
+            drop_lat = float(drop_lat) if drop_lat else None
+            drop_lng = float(drop_lng) if drop_lng else None
+        except (ValueError, TypeError):
+            raise ValidationError("Coordinates must be valid numbers.")
 
-        fare = calculate_fare(vehicle_type, distance)
-        driver_incentive, customer_reward = calculate_incentives_and_rewards(distance)
+        # Validate mandatory fields
+        if not all([pickup_lat, pickup_lng, vehicle_type, pickup_mode]):
+            raise ValidationError("pickup_lat, pickup_lng, vehicle_type, and pickup_mode are required.")
 
-        serializer.save(
-            user=self.request.user,
-            fare=fare,
-            driver_incentive=driver_incentive,
-            customer_reward=customer_reward
-        )
+        # Validate pickup_time for 'later' mode
+        if pickup_mode == "LATER" and not pickup_time:
+            raise ValidationError("pickup_time is required when pickup_mode is 'later'.")
 
+        # Calculate distance
+        distance_km = float(self.request.data.get("distance_km", 0))
+        if drop_lat and drop_lng:
+            try:
+                distance_km = calculate_distance(pickup_lat, pickup_lng, drop_lat, drop_lng)
+            except Exception as e:
+                raise ValidationError(f"Error calculating distance: {str(e)}")
+
+        # Calculate fare and incentives
+        try:
+            fare = calculate_fare(vehicle_type, distance_km)
+            driver_incentive, customer_reward = calculate_incentives_and_rewards(distance_km)
+        except Exception as e:
+            raise ValidationError(f"Error calculating fare or incentives: {str(e)}")
+
+        # Get nearest driver and distance
+        nearest_driver, driver_to_pickup_km = get_nearest_driver_distance(pickup_lat, pickup_lng)
+        print("Nearest driver:", nearest_driver)
+        print("Distance to pickup (km):", driver_to_pickup_km)
+
+        # Pickup to drop distance (you already have this)
+        if drop_lat and drop_lng:
+            pickup_to_drop_km = calculate_distance(pickup_lat, pickup_lng, drop_lat, drop_lng)
+        else:
+            pickup_to_drop_km = 0
+
+        print("Pickup to Drop distance (km):", pickup_to_drop_km)
+
+        # Save ride
+        ride = serializer.save(
+                    user=self.request.user,
+                    pickup_lat=pickup_lat,
+                    pickup_lng=pickup_lng,
+                    drop_lat=drop_lat,
+                    drop_lng=drop_lng,
+                    pickup_mode=pickup_mode,
+                    pickup_time=pickup_time if pickup_mode == "later" else timezone.now(),
+                    distance_km=distance_km,
+                    fare=fare,
+                    driver_incentive=driver_incentive,
+                    customer_reward=customer_reward,
+                    vehicle_type=vehicle_type,
+                    booking_id=booking_id
+                )
+        tokens = get_nearby_driver_tokens(ride.pickup_lat, ride.pickup_lng)
+        if tokens:
+            notification = {
+                "title": "New Ride Request 🚖",
+                "body": f"Pickup near you: {ride.pickup},-{ride.drop}"
+            }
+            data_payload = {
+                "ride_id": str(ride.id),
+                "booking_id":str(ride.booking_id),
+                "pickup_location":str(ride.pickup),
+                "drop_location":str(ride.drop),
+                "driver_to_pickup_km": round(driver_to_pickup_km, 2),
+                "pickup_to_drop_km": round(distance_km, 2),
+                "action": "NEW_RIDE"
+            }
+
+            print("Tokens found:", tokens)
+            try:
+                response = send_multicast(tokens, notification=notification, data=data_payload)
+                print("Notification response:", response)
+            except Exception as e:
+                logger.error(f"FCM send error: {e}")
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+
+        return Response({
+            "statusCode": 1,
+            "statusMessage": "Ride booked successfully",
+            "ride": serializer.data
+        }, status=status.HTTP_201_CREATED)
 
 class RideHistoryView(generics.ListAPIView):
     serializer_class = RideSerializer
@@ -225,6 +336,7 @@ class AvailableRidesView(generics.ListAPIView):
 class AcceptRideView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def post(self, request, ride_id):
+        print("Driver",dir(request))
         try:
             ride = Ride.objects.get(id=ride_id, status='pending')
             ride.status = 'accepted'
@@ -233,14 +345,6 @@ class AcceptRideView(APIView):
             return Response({"statusCode":"1","statusMessage": "Ride accepted"})
         except Exception as e:
             return Response({"statusCode":"0", "statusMessage": str(e)})
-
-from rest_framework import permissions, status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from .models import DriverLocation
-
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 
 class DriverLocationUpdate(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -251,6 +355,7 @@ class DriverLocationUpdate(APIView):
             longitude = request.data.get('longitude')
 
             if latitude is None or longitude is None:
+                logger.warning(f"Missing coordinates: latitude={latitude}, longitude={longitude}")
                 return Response(
                     {"statusCode": "0", "statusMessage": "Latitude and longitude are required"},
                     status=status.HTTP_400_BAD_REQUEST
@@ -260,42 +365,38 @@ class DriverLocationUpdate(APIView):
                 latitude = float(latitude)
                 longitude = float(longitude)
             except ValueError:
+                logger.warning(f"Invalid coordinates: latitude={latitude}, longitude={longitude}")
                 return Response(
                     {"statusCode": "0", "statusMessage": "Latitude and longitude must be numbers"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
             # Save to DB
-            loc, created = DriverLocation.objects.get_or_create(
-                driver=request.user,
-                defaults={'latitude': latitude, 'longitude': longitude}
-            )
-            if not created:
-                loc.latitude = latitude
-                loc.longitude = longitude
-                loc.save(update_fields=["latitude", "longitude"])
+            # loc, created = DriverLocation.objects.get_or_create(
+            #     driver=request.user,
+            #     defaults={'latitude': latitude, 'longitude': longitude}
+            # )
+            # if not created:
+            #     loc.latitude = latitude
+            #     loc.longitude = longitude
+            #     loc.save(update_fields=["latitude", "longitude"])
+            # logger.info(f"Driver location updated: driver={request.user.id}, lat={latitude}, lon={longitude}")
 
-            # 📡 Send location update to WebSocket group
+            request.user.current_lat = latitude
+            request.user.current_lng = longitude
+            request.user.save(update_fields=["current_lat", "current_lng"])
+            
+            # Send location update to WebSocket group
             channel_layer = get_channel_layer()
-            print("request.user.id",dir(request.user))
-            print("request.user.is_driver",request.user.is_driver)
-            print("request.user.id og",request.user.id)
-            
-            
-            async_to_sync(channel_layer.group_send)(
-                f"driver_{request.user.id}", 
-                {
-                    "type": "location_update",
-                    "latitude": latitude,
-                    "longitude": longitude,
-                    "driver": {
-                        "id": request.user.id,
-                        "username": request.user.username
-                    }
-                }
-            )
+            if channel_layer is None:
+                logger.error("Channel layer is not configured")
+                return Response(
+                    {"statusCode": "0", "statusMessage": "WebSocket channel layer not configured"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
             websocket_data = {
-                "type": "location.update",
+                "type": "location_update",  # Matches the consumer's method
                 "latitude": latitude,
                 "longitude": longitude,
                 "driver": {
@@ -303,12 +404,30 @@ class DriverLocationUpdate(APIView):
                     "username": request.user.username
                 }
             }
+            try:
+                async_to_sync(channel_layer.group_send)(
+                    f"driver_{request.user.id}",
+                    websocket_data
+                )
+                logger.info(f"Sent WebSocket message to group driver_{request.user.id}: {websocket_data}")
+            except Exception as e:
+                logger.error(f"Failed to send WebSocket message: {str(e)}")
+                return Response(
+                    {"statusCode": "0", "statusMessage": f"WebSocket error: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
             return Response(
-                {"statusCode": "1", "statusMessage": "Location updated successfully","driver":websocket_data},
+                {
+                    "statusCode": "1",
+                    "statusMessage": "Location updated successfully",
+                    "driver": websocket_data
+                },
                 status=status.HTTP_200_OK
             )
 
         except Exception as e:
+            logger.error(f"Error in DriverLocationUpdate: {str(e)}")
             return Response(
                 {"statusCode": "0", "statusMessage": f"Error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -615,14 +734,22 @@ class UserRegisterView(APIView):
 class DriverLoginView(APIView):
     def post(self, request):
         mobile = request.data.get('mobile')
+        fcm_token = request.data.get('fcm_token')
         if not mobile:
             return Response({
                 "statusCode": "0",
                 "statusMessage": "Mobile number is required"
             }, status=status.HTTP_400_BAD_REQUEST)
-
+        if not fcm_token:
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "FCM token is required"
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
         driver = User.objects.filter(mobile=mobile, is_driver=1).first()
         if driver:
+            driver.fcm_token = fcm_token
+            driver.save()
             tokens = get_tokens_for_user(driver)
             driver_data = UserLoginSerializer(driver).data
             return Response({
@@ -639,6 +766,38 @@ class DriverLoginView(APIView):
                 "is_oldUser": False
             })
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh")
+            if not refresh_token:
+                return Response({
+                    "statusCode": "0",
+                    "statusMessage": "Refresh token is required"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+
+            return Response({
+                "statusCode": "1",
+                "statusMessage": "Logout successful"
+            }, status=status.HTTP_200_OK)
+
+        except TokenError:
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "Invalid or expired token"
+            }, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -658,8 +817,8 @@ class DriverRegisterView(APIView):
         rc_book = request.FILES.get('rc_book')
         aadhaar = request.FILES.get('aadhaar')
         pan_card = request.FILES.get('pan_card')
-
-        if not all([mobile, username, vehicle_type, model, plate_number, state]):
+        fcm_token = request.data.get('fcm_token')
+        if not all([mobile, username, vehicle_type, model, plate_number, state,fcm_token]):
             return Response({
                 "statusCode": "0",
                 "statusMessage": "All fields are required for driver registration"
@@ -684,7 +843,8 @@ class DriverRegisterView(APIView):
             driving_license=driving_license,
             rc_book=rc_book,
             aadhaar=aadhaar,
-            pan_card=pan_card
+            pan_card=pan_card,
+            fcm_token=fcm_token
         )
 
         tokens = get_tokens_for_user(driver)
@@ -1317,7 +1477,7 @@ class UserVehicleTypeView(APIView):
 
     def get(self, request):
         vehicle_types = VehicleType.objects.all().order_by('name')
-        serializer = VehicleTypeSerializer(vehicle_types, many=True)
+        serializer = VehicleTypeSerializer(vehicle_types, many=True,context={'request': request})
         return Response({
             "statusCode": "1",
             "statusMessage": "Vehicle types retrieved successfully",
@@ -1327,15 +1487,15 @@ class UserVehicleTypeView(APIView):
 class DriverOnlineStatusUpdateView(generics.UpdateAPIView):
     serializer_class = UserOnlineStatusSerializer
     permission_classes = [permissions.IsAuthenticated]
-    queryset = User.objects.all()  # base queryset
+    queryset = User.objects.all()
 
     def get_queryset(self):
-        # Only drivers can be updated
-        return User.objects.filter(is_driver=1,approval_state='approved')
+        return User.objects.filter(is_driver=1, approval_state='approved')
 
     def patch(self, request, *args, **kwargs):
-        driver = self.get_object()  # ensures object comes from filtered queryset
-        serializer = self.get_serializer(driver, data=request.data, partial=True)
+        driver = self.get_object()
+        data = {"is_online": request.data.get("is_online")}
+        serializer = self.get_serializer(driver, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response({
@@ -1345,6 +1505,15 @@ class DriverOnlineStatusUpdateView(generics.UpdateAPIView):
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def get(self, request, *args, **kwargs):
+        driver = self.get_object()
+        serializer = self.get_serializer(driver)
+        return Response({
+            "StatusCode": 1,
+            "statusMessage": "Driver online status retrieved successfully",
+            "is_online": serializer.data['is_online']
+        }, status=status.HTTP_200_OK)
+        
 class UserProfilePatchView(APIView):
     parser_classes = [MultiPartParser, FormParser]  
     permission_classes = [IsAuthenticated]
@@ -1352,16 +1521,33 @@ class UserProfilePatchView(APIView):
     def patch(self, request, *args, **kwargs):
         print("Request Data:", request.data)
         user = request.user
-        serializer = UserSerializer(user, data=request.data, partial=True)
+        serializer = UserSerializer(
+            user,
+            data=request.data,
+            partial=True,
+            context={"request": request}  
+        )
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response({
+                "StatusCode": 1,
+                "statusMessage": "Profile updated successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def get(self, request, *args, **kwargs):
         user = request.user
-        serializer = UserSerializer(user)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
+        serializer = UserSerializer(
+            user,
+            context={"request": request}  
+        )
+        return Response({
+            "StatusCode": 1,
+            "statusMessage": "Profile retrieved successfully",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
+        
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib import messages
 from django.views import View
@@ -1431,4 +1617,39 @@ class ActivateUserAPIView(APIView):
             "status": "success",
             "message": f"{user.username} is active again."
         }, status=status.HTTP_200_OK)
-        
+                
+class UpdateFCMToken(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request):
+        print("Authenticated user:", request.user)  # prints to console
+
+        token = request.data.get("fcm_token")
+        if not token:
+            return Response({"statusCode": "0", "statusMessage": "FCM token required"}, status=400)
+
+        driver = request.user
+        driver.fcm_token = token
+        driver.save()
+        return Response({"statusCode": "1", "statusMessage": "FCM Token updated"})
+
+    
+from firebase_admin import messaging
+
+def send_new_ride_notification(token, ride_data):
+    message = messaging.Message(
+        data={
+            "type": "NEW_RIDE",
+            "ride_id": str(ride_data.id),
+            "pickup_lat": str(ride_data.pickup_lat),
+            "pickup_lng": str(ride_data.pickup_lng),
+        },
+        token=token,
+        android=messaging.AndroidConfig(
+            ttl=30,  # expire in 30s
+            priority="high"
+        )
+    )
+    response = messaging.send(message)
+    print("Sent FCM:", response)
+      

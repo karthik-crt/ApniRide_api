@@ -15,6 +15,27 @@ class UserRegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
 
+# class RideSerializer(serializers.ModelSerializer):
+#     username = serializers.CharField(source="user.username", read_only=True)
+#     driver_name = serializers.CharField(source="driver.username", read_only=True)
+
+#     class Meta:
+#         model = Ride
+#         fields = '__all__'
+#         read_only_fields = [
+#             'user','driver','status','fare','completed',
+#             'paid','created_at','completed_at'
+#         ]
+#         # Add the extra fields to output
+#         extra_fields = ['username', 'driver_name']
+
+#     def to_representation(self, instance):
+#         # include both default + extra fields
+#         rep = super().to_representation(instance)
+#         rep['username'] = instance.user.username if instance.user else None
+#         rep['driver_name'] = instance.driver.username if instance.driver else None
+#         return rep
+
 class RideSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     driver_name = serializers.CharField(source="driver.username", read_only=True)
@@ -23,20 +44,16 @@ class RideSerializer(serializers.ModelSerializer):
         model = Ride
         fields = '__all__'
         read_only_fields = [
-            'user','driver','status','fare','completed',
-            'paid','created_at','completed_at'
+            'user', 'driver', 'status', 'fare', 'completed',
+            'paid', 'created_at', 'completed_at', 'driver_incentive', 'customer_reward'
         ]
-        # Add the extra fields to output
-        extra_fields = ['username', 'driver_name']
 
     def to_representation(self, instance):
-        # include both default + extra fields
         rep = super().to_representation(instance)
         rep['username'] = instance.user.username if instance.user else None
         rep['driver_name'] = instance.driver.username if instance.driver else None
         return rep
-
-
+    
 class DriverLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = DriverLocation
@@ -154,10 +171,16 @@ class RefundRequestSerializer(serializers.ModelSerializer):
         fields = ['id', 'rideId', 'userId', 'refund_amount', 'reason', 'status', 'requested_at']
         
 class VehicleTypeSerializer(serializers.ModelSerializer):
+    vehicleImage = serializers.SerializerMethodField()
     class Meta:
         model = VehicleType
         fields = "__all__"  
         
+    def get_vehicleImage(self, obj):
+        request = self.context.get('request')
+        if obj.vehicleImage:  # assuming your model field name is `vehicleImage`
+            return request.build_absolute_uri(obj.vehicleImage.url)
+        return None   
         
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -191,6 +214,39 @@ class UserOnlineStatusSerializer(serializers.ModelSerializer):
         fields = ['is_online']
         
 class UserSerializer(serializers.ModelSerializer):
+    profile_photo = serializers.SerializerMethodField()
+    profile_photo_upload = serializers.FileField(write_only=True, required=False)
     class Meta:
         model = User
-        fields = ['username', 'profile_photo', 'mobile', 'emergency_contact_number', 'preferred_payment_method']        
+        fields = ['username', 'profile_photo','profile_photo_upload', 'mobile', 'emergency_contact_number','approval_state', 'preferred_payment_method']
+        
+    def get_profile_photo(self, obj):
+        request = self.context.get("request")
+        if obj.profile_photo:
+            return request.build_absolute_uri(obj.profile_photo.url)
+        
+    def update(self, instance, validated_data):
+        photo = validated_data.pop('profile_photo_upload', None)
+        if photo:
+            instance.profile_photo = photo
+        return super().update(instance, validated_data)    
+        return None                
+    
+class RegisterTokenSerializer(serializers.Serializer):
+    fcm_token = serializers.CharField()
+
+
+class UpdateLocationSerializer(serializers.Serializer):
+    lat = serializers.FloatField()
+    lng = serializers.FloatField()
+    is_available = serializers.BooleanField()
+
+
+class BookingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Ride
+        fields = ['id','rider','pickup_lat','pickup_lng','drop_lat','drop_lng','status','assigned_driver']
+        read_only_fields = ['id','status','assigned_driver']    
+        
+        
+        

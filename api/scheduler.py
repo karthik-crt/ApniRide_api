@@ -37,6 +37,5 @@ def start():
 
     try:
         scheduler.start()
-        logger.info("✅ APScheduler started")
     except Exception as e:
         logger.error(f"❌ APScheduler failed to start: {e}")

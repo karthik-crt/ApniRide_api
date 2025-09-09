@@ -24,6 +24,7 @@ urlpatterns = [
     path("rides/<int:ride_id>/cancel/", CancelRideView.as_view()),
     # Driver
     path('driver/<int:pk>/online-status/', DriverOnlineStatusUpdateView.as_view()),
+    path('fcm/token',UpdateFCMToken.as_view()),
     # History
     path('admin/booking-history/', AdminBookingHistoryView.as_view(), name='admin-booking-history'),
     path('user/booking-history/', UserBookingHistoryView.as_view(), name='user-booking-history'),
@@ -35,7 +36,7 @@ urlpatterns = [
     
     #Add vechical
     path('', include(router.urls)),
-    path('user/vehicle-types/', UserVehicleTypeView.as_view(), name='vehicle-type-list'),
+    path('user/vehicle-types/', UserVehicleTypeView.as_view()),
     
     # Payments
     path('payments/initiate/<int:ride_id>/', CreatePaymentView.as_view()),
@@ -86,5 +87,8 @@ urlpatterns = [
     path("suspend/<int:pk>/", SuspendUserAPIView.as_view(), name="suspend_user"),
     path("block/<int:pk>/", BlockUserAPIView.as_view(), name="block_user"),
     path("activate/<int:pk>/", ActivateUserAPIView.as_view(), name="activate_user"),
+    
+    # Logout
+    path('logout', LogoutView.as_view()),
     
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
