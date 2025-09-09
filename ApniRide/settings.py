@@ -37,9 +37,34 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:2000",
     "http://localhost:4200",
 ]
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:4200",
+    "http://127.0.0.1:4200",
+]
 # Application definition
-
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': 'debug.log',  # Logs will be written to this file
+        },
+    },
+    'loggers': {
+        '': {  # Root logger
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
 INSTALLED_APPS = [
+    "daphne",      
+    "channels",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -49,8 +74,30 @@ INSTALLED_APPS = [
     'api',
     'rest_framework',
     'rest_framework_simplejwt',
-    'corsheaders'
+    'corsheaders',
+    'django_apscheduler',
+    'rest_framework_simplejwt.token_blacklist',
 ]
+ASGI_APPLICATION = "ApniRide.asgi.application"
+
+# use only in production
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
+# use in development only 
+
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels.layers.InMemoryChannelLayer',
+#     },
+# }
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -153,7 +200,25 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-RAZORPAY_KEY_ID="dummy"
-RAZORPAY_SECRET="dummy"
+RAZORPAY_KEY_ID="rzp_test_jMpRm1HDX5ZT4x"
+RAZORPAY_KEY_SECRET="PERAVYmOCKh4ZygDuRzEJWzi"
 
 AUTH_USER_MODEL = 'api.User'
+
+
+GOOGLE_MAPS_API_KEY = None
+SMS_API_KEY = None
+PAYMENT_API = None
+
+from django.utils.functional import SimpleLazyObject
+from ApniRide.utils import getApiKey
+
+
+API_KEYS = SimpleLazyObject(getApiKey)
+
+GOOGLE_MAPS_API_KEY = lambda: API_KEYS["maps_api_key"]
+SMS_API_KEY = lambda: API_KEYS["sms_api_key"]
+PAYMENT_API = lambda: API_KEYS["payment_api_key"]
+FIREBASE_SERVICE_ACCOUNT_PATH = "E:/Cab/Cab-New/ApniRide-Backend/firebase_service_account.json"
+
+import ApniRide.firebase_app
