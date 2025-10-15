@@ -45,23 +45,64 @@ CSRF_TRUSTED_ORIGINS = [
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{levelname}] {asctime} {name}: {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+            'level': 'WARNING',  # Only warnings/errors to console
         },
         'file': {
             'class': 'logging.FileHandler',
-            'filename': 'debug.log',  # Logs will be written to this file
+            'filename': os.path.join(BASE_DIR, 'debug.log'),
+            'formatter': 'verbose',
+            'level': 'DEBUG',  # Everything DEBUG+ goes to file
         },
     },
     'loggers': {
-        '': {  # Root logger
-            'handlers': ['console', 'file'],
+        # Root logger
+        '': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',  # Capture all logs for file
+            'propagate': False,  # Prevent double printing to console
+        },
+        # APScheduler logs
+        'apscheduler': {
+            'handlers': ['file'],
             'level': 'INFO',
-            'propagate': True,
+            'propagate': False,
+        },
+        'apscheduler.scheduler': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Django Channels logs
+        'channels': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Daphne ASGI server logs
+        'daphne': {
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # Django request logs (HTTP POST/GET info)
+        'django.server': {
+            'handlers': ['console'],  # Only warnings/errors to console
+            'level': 'WARNING',
+            'propagate': False,
         },
     },
 }
+
 INSTALLED_APPS = [
     "daphne",      
     "channels",
@@ -152,8 +193,8 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-     'ACCESS_TOKEN_LIFETIME': timedelta(hours=24),
-     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+     'ACCESS_TOKEN_LIFETIME': timedelta(days=365*100),
+     'REFRESH_TOKEN_LIFETIME': timedelta(days=365*100),
      'ROTATE_REFRESH_TOKENS': True,  
      'BLACKLIST_AFTER_ROTATION': True  
 }
@@ -190,6 +231,15 @@ USE_I18N = True
 
 USE_TZ = True
 
+from celery.schedules import crontab
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_BEAT_SCHEDULE = {
+    'reset-earned-every-day-midnight': {
+        'task': 'your_app.tasks.reset_earned_field',
+        'schedule': crontab(hour=0, minute=0),  # 12:00 AM daily
+    },
+}
 
 
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
@@ -219,6 +269,10 @@ API_KEYS = SimpleLazyObject(getApiKey)
 GOOGLE_MAPS_API_KEY = lambda: API_KEYS["maps_api_key"]
 SMS_API_KEY = lambda: API_KEYS["sms_api_key"]
 PAYMENT_API = lambda: API_KEYS["payment_api_key"]
-FIREBASE_SERVICE_ACCOUNT_PATH = "E:/Cab/Cab-New/ApniRide-Backend/firebase_service_account.json"
+# FIREBASE_SERVICE_ACCOUNT_PATH = "E:/Cab/Cab-New/ApniRide-Backend/firebase_service_account.json"
+
+FIREBASE_SERVICE_ACCOUNT_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH",os.path.join(BASE_DIR, "firebase_service_account.json"))
+
+
 
 import ApniRide.firebase_app
