@@ -17,7 +17,8 @@ from datetime import timedelta
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 import os
-
+from dotenv import load_dotenv
+load_dotenv(os.path.join(BASE_DIR, '.env'))
 MEDIA_URL = '/documents/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'documents')
 
@@ -123,11 +124,13 @@ ASGI_APPLICATION = "ApniRide.asgi.application"
 
 # use only in production
 
+REDIS_HOST = os.getenv('REDIS_HOST')
+REDIS_PORT = os.getenv('REDIS_PORT')
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [(REDIS_HOST, int(REDIS_PORT))],
         },
     },
 }
@@ -236,7 +239,7 @@ from celery.schedules import crontab
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_BEAT_SCHEDULE = {
     'reset-earned-every-day-midnight': {
-        'task': 'your_app.tasks.reset_earned_field',
+        'task': 'api.tasks.reset_earned_field',
         'schedule': crontab(hour=0, minute=0),  # 12:00 AM daily
     },
 }
@@ -250,8 +253,8 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-RAZORPAY_KEY_ID="rzp_test_jMpRm1HDX5ZT4x"
-RAZORPAY_KEY_SECRET="PERAVYmOCKh4ZygDuRzEJWzi"
+RAZORPAY_KEY_ID=os.getenv('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET=os.getenv('RAZORPAY_KEY_SECRET')
 
 AUTH_USER_MODEL = 'api.User'
 
