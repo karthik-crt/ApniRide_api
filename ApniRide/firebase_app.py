@@ -9,6 +9,7 @@ if not firebase_admin._apps:
     firebase_admin_app = firebase_admin.initialize_app(cred)
 
 
+
 def send_multicast(tokens, notification=None, data=None):
     """
     Send FCM multicast notification to multiple devices

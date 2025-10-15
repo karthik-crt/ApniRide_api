@@ -22,6 +22,7 @@ urlpatterns = [
     path('rides/reject/<int:ride_id>/', RejectRideView.as_view()),
     path('rides/feedback/<int:ride_id>/', SubmitRideFeedbackView.as_view()),
     path("rides/<int:ride_id>/cancel/", CancelRideView.as_view()),
+    
     # Driver
     path('driver/<int:pk>/online-status/', DriverOnlineStatusUpdateView.as_view()),
     path('fcm/token',UpdateFCMToken.as_view()),

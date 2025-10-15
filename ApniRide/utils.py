@@ -1,5 +1,6 @@
 from django.conf import settings
 
+
 def getApiKey():
     from api.models import IntegrationSettings
     settings_obj = IntegrationSettings.objects.first()

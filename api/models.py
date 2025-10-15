@@ -100,6 +100,7 @@ class Ride(models.Model):
         return f"Ride {self.id} - {self.user.username} ({self.status})"
 
 
+
 class DriverLocation(models.Model):
     driver = models.OneToOneField(User, on_delete=models.CASCADE, related_name='location')
     latitude = models.FloatField()

@@ -24,6 +24,7 @@ def start():
         replace_existing=True,
     )
 
+
     # Clean old jobs weekly (Monday at midnight)
     scheduler.add_job(
         delete_old_job_executions,

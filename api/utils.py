@@ -10,7 +10,6 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
     # Radius of the Earth in km
     R = 6371.0
-
     # Convert degrees to radians
     phi1 = math.radians(lat1)
     phi2 = math.radians(lat2)

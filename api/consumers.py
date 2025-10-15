@@ -19,6 +19,7 @@ class LiveTrackingConsumer(AsyncWebsocketConsumer):
         await self.accept()
         
 
+
     async def disconnect(self, close_code):
         # Remove from group
         await self.channel_layer.group_discard(

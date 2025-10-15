@@ -303,6 +303,7 @@ class RideHistoryView(generics.ListAPIView):
 
         return qs.order_by('-created_at')
     
+    
 class AdminBookingHistoryView(generics.ListAPIView):
     serializer_class = RideHistorySerializer
     permission_classes = [permissions.IsAdminUser]  

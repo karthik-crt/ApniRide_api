@@ -36,6 +36,7 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 #         rep['driver_name'] = instance.driver.username if instance.driver else None
 #         return rep
 
+
 class RideSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     driver_name = serializers.CharField(source="driver.username", read_only=True)

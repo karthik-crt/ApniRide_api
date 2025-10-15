@@ -6,6 +6,7 @@ class MyAppConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "api"
 
+
     def ready(self):
         if "runserver" in sys.argv or "daphne" in sys.argv:
             from . import scheduler

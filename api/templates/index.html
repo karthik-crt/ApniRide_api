@@ -17,6 +17,7 @@
                 .then(response => response.json())
                 .then(order => {
                     // Step 2: Configure Razorpay options
+                    
                     const options = {
                         "key": "{{ key_id }}", // Razorpay key ID from backend
                         "amount": order.amount, // Order amount in paise

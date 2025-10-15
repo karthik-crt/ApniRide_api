@@ -18,4 +18,4 @@ def auto_reactivate_users():
             user.account_status = "active"
             user.suspended_until = None
             user.save(update_fields=["account_status", "suspended_until"])
-            logger.info(f"✅ Auto reactivated user {user.id}")
+            logger.info(f" Auto reactivated user {user.id}")

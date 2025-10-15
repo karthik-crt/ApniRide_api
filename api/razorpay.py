@@ -27,6 +27,7 @@ def create_order(request):
 def payment_success(request):
     return render(request, "success.html")
 
+
 def verify_signature(request):
     if request.method == "POST":
         # Data from Razorpay Checkout
