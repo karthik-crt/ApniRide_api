@@ -36924,3 +36924,157 @@ Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 202
 Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-09-09 10:43:23 IST)" executed successfully
 Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-09-09 10:43:23 IST)" executed successfully
 Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[DEBUG] 2025-10-15 15:45:40,499 asyncio: Using selector: SelectSelector
+[INFO] 2025-10-15 15:45:49,215 apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+[INFO] 2025-10-15 15:45:49,231 apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+[DEBUG] 2025-10-15 15:45:49,548 asyncio: Using selector: SelectSelector
+[INFO] 2025-10-15 15:45:49,580 apscheduler.scheduler: Added job "auto_reactivate_users" to job store "default"
+[INFO] 2025-10-15 15:45:49,580 apscheduler.scheduler: Added job "delete_old_job_executions" to job store "default"
+[INFO] 2025-10-15 15:45:49,580 apscheduler.scheduler: Scheduler started
+[INFO] 2025-10-15 15:45:50,756 django.utils.autoreload: Watching for file changes with StatReloader
+[INFO] 2025-10-15 15:45:51,760 apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+[INFO] 2025-10-15 15:45:51,760 apscheduler.scheduler: Adding job tentatively -- it will be properly scheduled when the scheduler starts
+[INFO] 2025-10-15 15:45:51,808 apscheduler.scheduler: Added job "auto_reactivate_users" to job store "default"
+[INFO] 2025-10-15 15:45:51,808 apscheduler.scheduler: Added job "delete_old_job_executions" to job store "default"
+[INFO] 2025-10-15 15:45:51,808 apscheduler.scheduler: Scheduler started
+[INFO] 2025-10-15 15:45:53,445 daphne.server: HTTP/2 support enabled
+[INFO] 2025-10-15 15:45:53,445 daphne.server: Configuring endpoint tcp:port=9000:interface=192.168.0.3
+[INFO] 2025-10-15 15:45:53,445 daphne.server: Listening on TCP address 192.168.0.3:9000
+[INFO] 2025-10-15 15:45:54,322 django.channels.server: HTTP PATCH /api/fcm/token 200 [0.26, 192.168.0.11:56684]
+[INFO] 2025-10-15 15:45:57,359 django.channels.server: HTTP GET /api/driver/3/online-status/ 200 [0.03, 192.168.0.11:56660]
+[INFO] 2025-10-15 15:45:57,359 django.channels.server: HTTP GET /api/profile/ 200 [0.03, 192.168.0.11:56658]
+[INFO] 2025-10-15 15:45:57,423 django.channels.server: HTTP GET /api/driver/dashboard/ 200 [0.10, 192.168.0.11:56672]
+[INFO] 2025-10-15 15:46:07,754 django.channels.server: HTTP GET /api/wallet/ 200 [0.04, 192.168.0.11:40438]
+[INFO] 2025-10-15 15:46:09,272 django.channels.server: HTTP GET /api/profile/ 200 [0.02, 192.168.0.11:40438]
+[INFO] 2025-10-15 15:46:09,288 django.channels.server: HTTP GET /api/driver/3/online-status/ 200 [0.03, 192.168.0.11:40448]
+[INFO] 2025-10-15 15:46:09,320 django.channels.server: HTTP GET /api/driver/dashboard/ 200 [0.05, 192.168.0.11:40462]
+[INFO] 2025-10-15 15:46:09,644 django.channels.server: HTTP PATCH /api/fcm/token 200 [0.02, 192.168.0.11:59764]
+[INFO] 2025-10-15 15:46:19,615 django.channels.server: HTTP GET /api/profile/ 200 [0.03, 192.168.0.11:59772]
+[WARNING] 2025-10-15 15:46:20,096 django.request: Not Found: /documents/profile_photos/profile_photo_AZsXFfs.jpg
+[WARNING] 2025-10-15 15:46:20,096 django.channels.server: HTTP GET /documents/profile_photos/profile_photo_AZsXFfs.jpg 404 [0.08, 192.168.0.11:42444]
+[INFO] 2025-10-15 15:46:20,733 django.channels.server: HTTP GET /api/user/vehicle-types 301 [0.05, 192.168.0.11:59772]
+[INFO] 2025-10-15 15:46:20,782 django.channels.server: HTTP GET /api/user/vehicle-types/ 200 [0.03, 192.168.0.11:59772]
+[INFO] 2025-10-15 15:46:20,797 django.channels.server: HTTP PATCH /api/fcm/token 200 [0.03, 192.168.0.11:42454]
+[INFO] 2025-10-15 15:46:51,773 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:46:51 IST)" (scheduled at 2025-10-15 15:46:51.760688+05:30)
+[INFO] 2025-10-15 15:46:51,787 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:47:51 IST)" executed successfully
+[INFO] 2025-10-15 15:46:51,787 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:47:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:46:51,803 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:47:51,775 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:48:51 IST)" (scheduled at 2025-10-15 15:47:51.760688+05:30)
+[INFO] 2025-10-15 15:47:51,775 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:48:51 IST)" (scheduled at 2025-10-15 15:47:51.760688+05:30)
+[INFO] 2025-10-15 15:47:51,775 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:48:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:47:51,791 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:48:51,784 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:49:51 IST)" (scheduled at 2025-10-15 15:48:51.760688+05:30)
+[INFO] 2025-10-15 15:48:51,784 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:49:51 IST)" (scheduled at 2025-10-15 15:48:51.760688+05:30)
+[INFO] 2025-10-15 15:48:51,784 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:49:51 IST)" executed successfully
+[INFO] 2025-10-15 15:48:51,784 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:49:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:48:51,800 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:49:51,770 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:50:51 IST)" (scheduled at 2025-10-15 15:49:51.760688+05:30)
+[INFO] 2025-10-15 15:49:51,770 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:50:51 IST)" (scheduled at 2025-10-15 15:49:51.760688+05:30)
+[INFO] 2025-10-15 15:49:51,770 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:50:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:49:51,786 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:50:51,764 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:51:51 IST)" (scheduled at 2025-10-15 15:50:51.760688+05:30)
+[INFO] 2025-10-15 15:50:51,764 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:51:51 IST)" executed successfully
+[INFO] 2025-10-15 15:51:51,777 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:52:51 IST)" (scheduled at 2025-10-15 15:51:51.760688+05:30)
+[INFO] 2025-10-15 15:51:51,779 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:52:51 IST)" (scheduled at 2025-10-15 15:51:51.760688+05:30)
+[INFO] 2025-10-15 15:51:51,785 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:52:51 IST)" executed successfully
+[INFO] 2025-10-15 15:51:51,787 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:52:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:51:51,800 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:52:51,773 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:53:51 IST)" (scheduled at 2025-10-15 15:52:51.760688+05:30)
+[INFO] 2025-10-15 15:52:51,777 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:53:51 IST)" executed successfully
+[INFO] 2025-10-15 15:52:51,777 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:53:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:52:51,789 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:53:51,769 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:54:51 IST)" (scheduled at 2025-10-15 15:53:51.760688+05:30)
+[INFO] 2025-10-15 15:53:51,769 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:54:51 IST)" executed successfully
+[INFO] 2025-10-15 15:53:51,769 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:54:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:53:51,786 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:54:51,775 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:55:51 IST)" (scheduled at 2025-10-15 15:54:51.760688+05:30)
+[INFO] 2025-10-15 15:54:51,775 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:55:51 IST)" (scheduled at 2025-10-15 15:54:51.760688+05:30)
+[INFO] 2025-10-15 15:54:51,775 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:55:51 IST)" executed successfully
+[INFO] 2025-10-15 15:54:51,775 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:55:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:54:51,797 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:55:51,774 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:56:51 IST)" (scheduled at 2025-10-15 15:55:51.760688+05:30)
+[INFO] 2025-10-15 15:55:51,781 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:56:51 IST)" executed successfully
+[INFO] 2025-10-15 15:55:51,781 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:56:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:55:51,901 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:56:51,774 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:57:51 IST)" (scheduled at 2025-10-15 15:56:51.760688+05:30)
+[INFO] 2025-10-15 15:56:51,774 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:57:51 IST)" (scheduled at 2025-10-15 15:56:51.760688+05:30)
+[INFO] 2025-10-15 15:56:51,785 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:57:51 IST)" executed successfully
+[INFO] 2025-10-15 15:56:51,785 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:57:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:56:51,805 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:57:51,770 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:58:51 IST)" (scheduled at 2025-10-15 15:57:51.760688+05:30)
+[INFO] 2025-10-15 15:57:51,770 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:58:51 IST)" (scheduled at 2025-10-15 15:57:51.760688+05:30)
+[INFO] 2025-10-15 15:57:51,774 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:58:51 IST)" executed successfully
+[INFO] 2025-10-15 15:57:51,775 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:58:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:57:51,783 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:58:51,770 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:59:51 IST)" (scheduled at 2025-10-15 15:58:51.760688+05:30)
+[INFO] 2025-10-15 15:58:51,770 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:59:51 IST)" (scheduled at 2025-10-15 15:58:51.760688+05:30)
+[INFO] 2025-10-15 15:58:51,770 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:59:51 IST)" executed successfully
+[INFO] 2025-10-15 15:58:51,770 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 15:59:51 IST)" executed successfully
+[WARNING] 2025-10-15 15:58:51,791 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 15:59:51,765 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:00:51 IST)" (scheduled at 2025-10-15 15:59:51.760688+05:30)
+[INFO] 2025-10-15 15:59:51,765 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:00:51 IST)" executed successfully
+[INFO] 2025-10-15 16:00:51,765 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:01:51 IST)" (scheduled at 2025-10-15 16:00:51.760688+05:30)
+[INFO] 2025-10-15 16:00:51,765 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:01:51 IST)" executed successfully
+[INFO] 2025-10-15 16:01:51,778 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:02:51 IST)" (scheduled at 2025-10-15 16:01:51.760688+05:30)
+[INFO] 2025-10-15 16:01:51,778 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:02:51 IST)" (scheduled at 2025-10-15 16:01:51.760688+05:30)
+[INFO] 2025-10-15 16:01:51,780 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:02:51 IST)" executed successfully
+[INFO] 2025-10-15 16:01:51,780 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:02:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:01:51,792 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:02:51,784 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:03:51 IST)" (scheduled at 2025-10-15 16:02:51.760688+05:30)
+[INFO] 2025-10-15 16:02:51,784 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:03:51 IST)" (scheduled at 2025-10-15 16:02:51.760688+05:30)
+[INFO] 2025-10-15 16:02:51,788 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:03:51 IST)" executed successfully
+[INFO] 2025-10-15 16:02:51,793 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:03:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:02:51,802 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:03:51,780 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:04:51 IST)" (scheduled at 2025-10-15 16:03:51.760688+05:30)
+[INFO] 2025-10-15 16:03:51,780 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:04:51 IST)" executed successfully
+[INFO] 2025-10-15 16:03:51,780 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:04:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:03:51,796 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:04:51,774 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:05:51 IST)" (scheduled at 2025-10-15 16:04:51.760688+05:30)
+[INFO] 2025-10-15 16:04:51,774 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:05:51 IST)" (scheduled at 2025-10-15 16:04:51.760688+05:30)
+[INFO] 2025-10-15 16:04:51,774 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:05:51 IST)" executed successfully
+[INFO] 2025-10-15 16:04:51,774 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:05:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:04:51,789 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:05:51,786 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:06:51 IST)" (scheduled at 2025-10-15 16:05:51.760688+05:30)
+[INFO] 2025-10-15 16:05:51,786 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:06:51 IST)" (scheduled at 2025-10-15 16:05:51.760688+05:30)
+[INFO] 2025-10-15 16:05:51,786 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:06:51 IST)" executed successfully
+[INFO] 2025-10-15 16:05:51,786 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:06:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:05:51,800 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:06:51,781 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:07:51 IST)" (scheduled at 2025-10-15 16:06:51.760688+05:30)
+[INFO] 2025-10-15 16:06:51,781 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:07:51 IST)" (scheduled at 2025-10-15 16:06:51.760688+05:30)
+[INFO] 2025-10-15 16:06:51,781 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:07:51 IST)" executed successfully
+[INFO] 2025-10-15 16:06:51,781 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:07:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:06:51,794 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:07:51,772 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:08:51 IST)" (scheduled at 2025-10-15 16:07:51.760688+05:30)
+[INFO] 2025-10-15 16:07:51,772 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:08:51 IST)" (scheduled at 2025-10-15 16:07:51.760688+05:30)
+[INFO] 2025-10-15 16:07:51,772 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:08:51 IST)" executed successfully
+[INFO] 2025-10-15 16:07:51,772 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:08:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:07:51,787 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:08:51,782 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:09:51 IST)" (scheduled at 2025-10-15 16:08:51.760688+05:30)
+[INFO] 2025-10-15 16:08:51,782 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:09:51 IST)" (scheduled at 2025-10-15 16:08:51.760688+05:30)
+[INFO] 2025-10-15 16:08:51,782 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:09:51 IST)" executed successfully
+[INFO] 2025-10-15 16:08:51,782 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:09:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:08:51,798 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:09:51,775 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:10:51 IST)" (scheduled at 2025-10-15 16:09:51.760688+05:30)
+[INFO] 2025-10-15 16:09:51,775 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:10:51 IST)" (scheduled at 2025-10-15 16:09:51.760688+05:30)
+[INFO] 2025-10-15 16:09:51,782 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:10:51 IST)" executed successfully
+[INFO] 2025-10-15 16:09:51,782 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:10:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:09:51,791 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:10:51,774 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:11:51 IST)" (scheduled at 2025-10-15 16:10:51.760688+05:30)
+[INFO] 2025-10-15 16:10:51,774 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:11:51 IST)" (scheduled at 2025-10-15 16:10:51.760688+05:30)
+[INFO] 2025-10-15 16:10:51,779 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:11:51 IST)" executed successfully
+[INFO] 2025-10-15 16:10:51,781 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:11:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:10:51,794 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:11:51,762 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:12:51 IST)" (scheduled at 2025-10-15 16:11:51.760688+05:30)
+[INFO] 2025-10-15 16:11:51,762 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:12:51 IST)" (scheduled at 2025-10-15 16:11:51.760688+05:30)
+[INFO] 2025-10-15 16:11:51,762 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:12:51 IST)" executed successfully
+[INFO] 2025-10-15 16:11:51,762 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:12:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:11:51,780 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:12:52,021 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:13:51 IST)" (scheduled at 2025-10-15 16:12:51.760688+05:30)
+[INFO] 2025-10-15 16:12:52,021 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:13:51 IST)" (scheduled at 2025-10-15 16:12:51.760688+05:30)
+[INFO] 2025-10-15 16:12:52,054 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:13:51 IST)" executed successfully
+[INFO] 2025-10-15 16:12:52,054 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:13:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:12:52,113 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
+[INFO] 2025-10-15 16:13:51,900 apscheduler.executors.default: Running job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:14:51 IST)" (scheduled at 2025-10-15 16:13:51.760688+05:30)
+[INFO] 2025-10-15 16:13:51,911 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:14:51 IST)" executed successfully
+[INFO] 2025-10-15 16:13:51,924 apscheduler.executors.default: Job "auto_reactivate_users (trigger: interval[0:01:00], next run at: 2025-10-15 16:14:51 IST)" executed successfully
+[WARNING] 2025-10-15 16:13:51,956 django_apscheduler.jobstores: Job 'auto_reactivate_users' no longer exists! Skipping logging of job execution...
