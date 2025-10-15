@@ -40,6 +40,7 @@ class RideSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     driver_name = serializers.CharField(source="driver.username", read_only=True)
 
+
     class Meta:
         model = Ride
         fields = '__all__'
