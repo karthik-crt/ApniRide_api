@@ -46,3 +46,72 @@ def verify_signature(request):
         except razorpay.errors.SignatureVerificationError:
             return HttpResponse("Signature verification failed", status=400)
     return HttpResponse("Method not allowed", status=405)
+
+
+from decimal import Decimal
+from django.conf import settings
+import razorpay
+
+# Initialize Razorpay client
+razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
+
+def withdraw_to_driver(driver_wallet, amount, beneficiary_name, account_number, ifsc):
+    """
+    Withdraw money from driver's wallet to their bank account using Razorpay Payouts.
+
+    Args:
+        driver_wallet: Wallet object (must have 'balance' field)
+        amount: Decimal, withdrawal amount in INR
+        beneficiary_name: str, driver's bank account name
+        account_number: str, driver's bank account number
+        ifsc: str, bank IFSC code
+
+    Returns:
+        dict: { 'success': bool, 'balance': Decimal, 'payout_id': str, 'error': str }
+    """
+
+    # 1. Validate amount
+    if amount <= 0:
+        return {"success": False, "error": "Amount must be greater than zero"}
+
+    # 2. Check wallet balance
+    if driver_wallet.balance < amount:
+        return {"success": False, "error": "Insufficient wallet balance"}
+
+    try:
+        # Convert INR to paise
+        payout_amount = int(amount * 100)
+
+        # 3. Call Razorpay Payouts API
+        payout = razorpay_client.payouts.create({
+            "account_number": settings.RAZORPAY_ACCOUNT_NUMBER,  # your Razorpay account
+            "fund_account": {
+                "account_type": "bank_account",
+                "bank_account": {
+                    "name": beneficiary_name,
+                    "ifsc": ifsc,
+                    "account_number": account_number
+                }
+            },
+            "amount": payout_amount,
+            "currency": "INR",
+            "mode": "IMPS",
+            "purpose": "payout"
+        })
+
+        # 4. Deduct wallet balance after successful payout
+        driver_wallet.balance -= Decimal(amount)
+        driver_wallet.save()
+
+        # 5. Optionally, create a wallet transaction record here
+        # WalletTransaction.objects.create(
+        #     wallet=driver_wallet,
+        #     amount=amount,
+        #     transaction_type='withdraw',
+        #     description=f"Payout ID: {payout.get('id')}"
+        # )
+
+        return {"success": True, "balance": driver_wallet.balance, "payout_id": payout.get("id")}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}

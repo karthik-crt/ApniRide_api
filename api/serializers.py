@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import User, Ride, DriverLocation, Payment, OTP,IntegrationSettings
-
+from .models import *
 
 class UserLoginSerializer(serializers.ModelSerializer):
     class Meta:
@@ -39,15 +39,18 @@ class UserRegisterSerializer(serializers.ModelSerializer):
 
 class RideSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
+    usernumber = serializers.CharField(source="user.mobile", read_only=True)
     driver_name = serializers.CharField(source="driver.username", read_only=True)
-
-
+    driver_number = serializers.CharField(source="driver.mobile", read_only=True)
+    driver_vehicle_number = serializers.CharField(source="driver.plate_number", read_only=True)
+    driver_image = serializers.CharField(source="driver.profile_photo", read_only=True)
+    vehicle_name = serializers.CharField(source="driver.model", read_only=True)
     class Meta:
         model = Ride
         fields = '__all__'
         read_only_fields = [
-            'user', 'driver', 'status', 'fare', 'completed',
-            'paid', 'created_at', 'completed_at', 'driver_incentive', 'customer_reward'
+            'user', 'driver', 'status', 'fare', 'completed','driver_image','driver_vehicle_number','driver_name','driver_number',
+            'paid', 'created_at', 'completed_at', 'driver_incentive', 'customer_reward','vehicle_name','usernumber','driver_earnings','driver_to_pickup_km'
         ]
 
     def to_representation(self, instance):
@@ -98,13 +101,12 @@ class AdminRideSerializer(serializers.ModelSerializer):
     userName = serializers.CharField(source='user.username', read_only=True)
     driverName = serializers.CharField(source='driver.username', read_only=True)
     rejectedByIds = serializers.PrimaryKeyRelatedField(many=True, source='rejected_by', read_only=True)
-
     class Meta:
         model = Ride
         fields = [
             'id', 'pickup', 'drop', 'fare', 'status', 'completed', 'paid',
             'created_at', 'completed_at', 'rating', 'feedback', 'user', 'driver',
-            'userName', 'driverName', 'rejectedByIds'
+            'userName', 'driverName', 'rejectedByIds','pickup_lat','pickup_lng','drop_lat','drop_lng'
         ]    
 
 class DriverPingSerializer(serializers.ModelSerializer):
@@ -145,6 +147,20 @@ class DriverIncentiveSerializer(serializers.ModelSerializer):
         model = DriverIncentive
         fields = "__all__"        
 
+class GetDriverIncentiveSerializer(serializers.ModelSerializer):
+    min_rides = serializers.IntegerField(source='days',allow_null=True, required=False)  # Rename 'days' as 'min_rides'
+
+    class Meta:
+        model = DriverIncentive
+        fields = [
+            'id',
+            'ride_type',
+            'distance',
+            'min_rides',        # renamed from 'days'
+            'driver_incentive',
+            'details',
+            'created_at',
+        ]
 from .models import Payment, RefundRequest,VehicleType
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -173,16 +189,21 @@ class RefundRequestSerializer(serializers.ModelSerializer):
         fields = ['id', 'rideId', 'userId', 'refund_amount', 'reason', 'status', 'requested_at']
         
 class VehicleTypeSerializer(serializers.ModelSerializer):
-    vehicleImage = serializers.SerializerMethodField()
+    # Read-only field to provide full URL to frontend
+    vehicleImageUrl = serializers.SerializerMethodField(read_only=True)
+    pricing_rules = serializers.SerializerMethodField()
     class Meta:
         model = VehicleType
-        fields = "__all__"  
-        
-    def get_vehicleImage(self, obj):
+        fields = '__all__'  # includes vehicleImage field
+
+    def get_vehicleImageUrl(self, obj):
         request = self.context.get('request')
-        if obj.vehicleImage:  # assuming your model field name is `vehicleImage`
+        if obj.vehicleImage:
             return request.build_absolute_uri(obj.vehicleImage.url)
-        return None   
+        return None  
+    def get_pricing_rules(self, obj):
+        rules = FareRule.objects.filter(vehicle_type=obj.name).order_by('min_distance')
+        return FareRuleSerializer(rules, many=True).data 
         
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -194,7 +215,7 @@ class RefundRequestSerializer(serializers.ModelSerializer):
         model = RefundRequest
         fields = ['refund_amount', 'reason', 'status', 'requested_at']
 
-class RideHistorySerializer(serializers.ModelSerializer):
+class AdminRideHistorySerializer(serializers.ModelSerializer):
     payment = PaymentSerializer(read_only=True)
     refund_requests = RefundRequestSerializer(many=True, read_only=True)
     driver_name = serializers.CharField(source='driver.username', default=None)
@@ -251,4 +272,169 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = ['id','status','assigned_driver']    
         
         
-        
+from rest_framework import serializers
+from .models import Ride
+
+class RideStatusSerializer(serializers.ModelSerializer):
+    driver_name = serializers.SerializerMethodField()
+    driver_photo = serializers.SerializerMethodField()
+    vehicle_number = serializers.SerializerMethodField()
+    otp = serializers.SerializerMethodField()
+    driver_number = serializers.SerializerMethodField()
+    vechicle_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Ride
+        fields = [
+            'booking_id', 'status', 'pickup', 'drop', 'pickup_time',
+            'driver_name', 'driver_number', 'vechicle_name',
+            'driver_photo', 'vehicle_number', 'otp',
+            'fare', 'completed', 'paid','vehicle_type','gst_amount','payment_type'
+        ]
+    def get_driver_name(self, obj):
+        return obj.driver.username if obj.driver else None
+
+    def get_driver_photo(self, obj):
+        if obj.driver and obj.driver.profile_photo:
+            request = self.context.get('request')
+            photo_url = obj.driver.profile_photo.url
+            return request.build_absolute_uri(photo_url) if request else photo_url
+        return None
+
+    def get_vehicle_number(self, obj):
+        return obj.driver.plate_number if obj.driver else None
+
+    def get_otp(self, obj):
+        return getattr(obj, "otp", None)
+
+    def get_driver_number(self, obj):
+        return obj.driver.mobile if obj.driver else None
+
+    def get_vechicle_name(self, obj):
+        return obj.driver.model if obj.driver else None
+    
+    
+class DriverEarningsSerializer(serializers.Serializer):
+    period = serializers.CharField()
+    total_earnings = serializers.FloatField()
+    total_rides = serializers.IntegerField()    
+    
+    
+class RideInvoiceSerializer(serializers.ModelSerializer):
+    vehicle_name = serializers.SerializerMethodField()
+    vehicle_image = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Ride
+        fields = [
+            'id', 'booking_id', 'pickup', 'drop', 'pickup_time',
+            'fare', 'vehicle_name', 'vehicle_image'
+        ]
+    
+    def get_vehicle_name(self, obj):
+        return obj.vehicle_type  # Or get from VehicleType model if linked
+    
+    def get_vehicle_image(self, obj):
+        vehicle = VehicleType.objects.filter(name=obj.vehicle_type).first()
+        if vehicle and vehicle.vehicleImage:
+            request = self.context.get('request')
+            return request.build_absolute_uri(vehicle.vehicleImage.url) if request else vehicle.vehicleImage.url
+        return None    
+    
+from django.urls import reverse
+    
+class RideHistorySerializer(serializers.ModelSerializer):
+    vehicle_display = serializers.SerializerMethodField()
+    pickup_info = serializers.SerializerMethodField()
+    invoice_pdf_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Ride
+        fields = ['id', 'vehicle_display', 'fare', 'pickup_info', 'pickup_time', 'invoice_pdf_url']
+    
+    def get_vehicle_display(self, obj):
+        # Pull vehicle info from driver if available
+        driver = obj.driver or obj.assigned_driver
+        if driver:
+            return f"{driver.vehicle_type or 'N/A'}, {driver.model or 'N/A'}, {driver.plate_number or 'N/A'}"
+        # fallback to ride vehicle_type if no driver assigned
+        return f"{obj.vehicle_type or 'N/A'}"
+    
+    def get_pickup_info(self, obj):
+        return f"{obj.pickup} ({obj.pickup_time.strftime('%I.%M %p')})"
+    
+    def get_invoice_pdf_url(self, obj):
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(reverse('ride-invoice', args=[obj.id]))
+        return None
+    
+class DriverRatingSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.username", read_only=True)
+    user_image = serializers.ImageField(source="user.profile_photo", read_only=True)
+    driver_name = serializers.CharField(source="driver.username", read_only=True)
+
+    class Meta:
+        model = DriverRating
+        fields = ["id", "ride", "user", "driver", "stars", "feedback","user_image", "created_at", "user_name", "driver_name"]
+        read_only_fields = ["id", "created_at", "user","user_image", "driver", "ride"]    
+
+
+class DriverWalletSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DriverWallet
+        fields = ["id", "driver", "balance", "updated_at"]
+        read_only_fields = ["id", "driver", "balance", "updated_at"]
+
+
+class WalletTransactionSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+    def validate_amount(self, value):
+        if value <= 0:
+            raise serializers.ValidationError("Amount must be greater than zero.")
+        return value
+
+class UserWalletTransactionSerializer(serializers.ModelSerializer):
+    ride_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserWalletTransaction
+        fields = [
+            'id',
+            'transaction_type',
+            'amount',
+            'description',
+            'balance_after',
+            'created_at',
+            'ride_id'
+        ]
+
+    def get_ride_id(self, obj):
+        return obj.related_ride.id if obj.related_ride else None
+    
+class DriverIncentiveProgressSerializer(serializers.ModelSerializer):
+    ride_type = serializers.CharField(source='incentive_rule.ride_type', read_only=True)
+    target_rides = serializers.IntegerField(source='incentive_rule.min_rides', read_only=True)
+    cashback = serializers.DecimalField(source='incentive_rule.driver_incentive', max_digits=10, decimal_places=2, read_only=True)
+    days_left = serializers.SerializerMethodField()
+    progress_percent = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DriverIncentiveProgress
+        fields = [
+            'id',
+            'ride_type',
+            'rides_completed',
+            'target_rides',
+            'days_left',
+            'progress_percent',
+            'cashback',
+            'earned',
+        ]
+
+    def get_days_left(self, obj):
+        return obj.days_left
+
+    def get_progress_percent(self, obj):
+        return obj.progress_percent

@@ -131,3 +131,47 @@ class DriverLocationConsumer(AsyncWebsocketConsumer):
             "longitude": event["longitude"],
             "driver": event["driver"]
         }))
+
+import json
+from channels.generic.websocket import AsyncWebsocketConsumer
+
+class RideLocationConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.ride_id = self.scope['url_route']['kwargs']['ride_id']
+        self.room_group_name = f"ride_{self.ride_id}"
+
+        # Join ride group
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        # Leave ride group
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        latitude = data.get("lat")
+        longitude = data.get("lng")
+
+        # Broadcast location to group
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "location_update",
+                "lat": latitude,
+                "lng": longitude
+            }
+        )
+
+    async def location_update(self, event):
+        await self.send(text_data=json.dumps({
+            "lat": event["lat"],
+            "lng": event["lng"]
+        }))
+

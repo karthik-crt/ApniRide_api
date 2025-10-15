@@ -169,12 +169,15 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 from django.utils import timezone
 from .utils import calculate_distance,get_nearby_driver_tokens,get_nearest_driver_distance
-from ApniRide.firebase_app import send_multicast
-class BookRideView(generics.CreateAPIView):
+from ApniRide.firebase_app import send_multicast,send_fcm_notification
+
+class BookRideViews(generics.CreateAPIView):
     serializer_class = RideSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
+        type = self.request.data.get("type")
+        print("self.request.data.get",type)
         # Extract and validate mandatory fields
         pickup_lat = self.request.data.get("pickup_lat")
         pickup_lng = self.request.data.get("pickup_lng")
@@ -260,8 +263,8 @@ class BookRideView(generics.CreateAPIView):
                 "booking_id":str(ride.booking_id),
                 "pickup_location":str(ride.pickup),
                 "drop_location":str(ride.drop),
-                "driver_to_pickup_km": round(driver_to_pickup_km, 2),
-                "pickup_to_drop_km": round(distance_km, 2),
+                "driver_to_pickup_km": str(round(driver_to_pickup_km, 2)),  
+                "pickup_to_drop_km": str(round(distance_km, 2)),
                 "action": "NEW_RIDE"
             }
 
@@ -270,7 +273,7 @@ class BookRideView(generics.CreateAPIView):
                 response = send_multicast(tokens, notification=notification, data=data_payload)
                 print("Notification response:", response)
             except Exception as e:
-                logger.error(f"FCM send error: {e}")
+                logger.error(f"FCM send errors: {e}")
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -286,40 +289,52 @@ class BookRideView(generics.CreateAPIView):
 class RideHistoryView(generics.ListAPIView):
     serializer_class = RideSerializer
     permission_classes = [permissions.IsAuthenticated]
-
+ 
     def get_queryset(self):
         user = self.request.user
         qs = Ride.objects.none()
-
+ 
         if bool(user.is_driver):
             qs = Ride.objects.filter(driver=user)
         else:
             qs = Ride.objects.filter(user=user)
-
+ 
         # Optional: filter by status
-        status = self.request.query_params.get('status')
-        if status:
-            qs = qs.filter(status=status)
-
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param)
+ 
         return qs.order_by('-created_at')
+ 
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+ 
+        return Response({
+            "StatusCode":"1",
+            "Message": "Booking History List",
+            "count": queryset.count(),
+            "rides": serializer.data
+        }, status=status.HTTP_200_OK)
+ 
     
     
 class AdminBookingHistoryView(generics.ListAPIView):
-    serializer_class = RideHistorySerializer
+    serializer_class = AdminRideHistorySerializer
     permission_classes = [permissions.IsAdminUser]  
 
     def get_queryset(self):
         print("AdminBookingHistoryView called")
         return Ride.objects.all().order_by('-created_at')  
 class UserBookingHistoryView(generics.ListAPIView):
-    serializer_class = RideHistorySerializer
+    serializer_class = AdminRideHistorySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return Ride.objects.filter(user=self.request.user).order_by('-created_at')    
     
 class DriverRideHistoryView(generics.ListAPIView):
-    serializer_class = RideHistorySerializer
+    serializer_class = AdminRideHistorySerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -340,9 +355,40 @@ class AcceptRideView(APIView):
         print("Driver",dir(request))
         try:
             ride = Ride.objects.get(id=ride_id, status='pending')
+            ride.otp = random.randint(1000,9999)
             ride.status = 'accepted'
             ride.driver = request.user
             ride.save()
+            request.user.is_available = False
+            request.user.save()
+            customer_token = ride.user.fcm_token 
+            if customer_token:
+                notification = {
+                    "title": "Ride Accepted 🚖",
+                    "body": f"Your ride from {ride.pickup} to {ride.drop} has been accepted by {ride.driver.username}."
+                }
+                data_payload = {
+                    "ride_id": str(ride.id),
+                    "booking_id": str(ride.booking_id),
+                    "driver_name": ride.driver.username,
+                    "driver_id": str(ride.driver.id),
+                    "pickup_location": str(ride.pickup),
+                    "drop_location": str(ride.drop),
+                    "action": "RIDE_ACCEPTED"
+                }
+                try:
+                    response = send_multicast([customer_token], notification=notification, data=data_payload)
+                    print("Notification response:", response)
+                    print("Success count:", response.success_count)
+                    print("Failure count:", response.failure_count)
+
+                    for idx, resp in enumerate(response.responses):
+                        if resp.success:
+                            print(f"Message {idx} sent successfully")
+                        else:
+                            print(f"Message {idx} failed with error: {resp.exception}")
+                except Exception as e:
+                    logger.error(f"FCM send errors: {e}")
             return Response({"statusCode":"1","statusMessage": "Ride accepted"})
         except Exception as e:
             return Response({"statusCode":"0", "statusMessage": str(e)})
@@ -486,10 +532,50 @@ class ConfirmPaymentView(APIView):
         except Exception as e:
             return Response({"statusCode":"0", "statusMessage": str(e)})
     
+# class RejectRideView(APIView):
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def post(self, request, ride_id):
+#         try:
+#             ride = Ride.objects.get(id=ride_id, status='pending')
+#         except Ride.DoesNotExist:
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "failed",
+#                 "error": "Ride not found or already accepted/rejected."
+#             }, status=404)
+
+#         # Add current driver to rejected_by list
+#         ride.rejected_by.add(request.user)
+#         ride.save()
+
+#         # Optional notification if model exists
+#         if hasattr(models, "Notification") and ride.user:
+#             Notification.objects.create(
+#                 user=ride.user,
+#                 title='Ride Rejected',
+#                 message=f'Your ride to {ride.drop} was rejected by {request.user.username}. Searching for another driver...'
+#             )
+
+#         return Response({
+#             "statusCode": "1",
+#             "statusMessage": "Ride rejected, rider notified.",
+#             "rider_name": ride.user.username if ride.user else None
+#         })
+
+  
+from datetime import timedelta
+from django.utils import timezone
+from django.db.models import Count
+
 class RejectRideView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, ride_id):
+        user = request.user
+        if not user.is_driver:
+            return Response({"statusCode": "0", "error": "Only drivers can reject rides."}, status=403)
+
         try:
             ride = Ride.objects.get(id=ride_id, status='pending')
         except Ride.DoesNotExist:
@@ -499,25 +585,44 @@ class RejectRideView(APIView):
                 "error": "Ride not found or already accepted/rejected."
             }, status=404)
 
-        # Add current driver to rejected_by list
-        ride.rejected_by.add(request.user)
+        # Prevent rejecting same ride multiple times
+        if user in ride.rejected_by.all():
+            return Response({"statusCode": "0", "error": "You have already rejected this ride."}, status=400)
+
+        # Add to rejected_by
+        ride.rejected_by.add(user)
         ride.save()
 
-        # Optional notification if model exists
+        # Count today's rejections for this driver
+        today = timezone.now().date()
+        rejected_today = Ride.objects.filter(
+            rejected_by=user,
+            created_at__date=today  # Ensure Ride model has created_at field
+        ).count()
+
+        if rejected_today >= 3:
+            # Suspend driver
+            user.account_status = 'suspended'
+            user.suspended_until = timezone.now() + timedelta(hours=24)
+            user.save(update_fields=["account_status", "suspended_until"])
+
+        # Notify rider (optional)
         if hasattr(models, "Notification") and ride.user:
             Notification.objects.create(
                 user=ride.user,
                 title='Ride Rejected',
-                message=f'Your ride to {ride.drop} was rejected by {request.user.username}. Searching for another driver...'
+                message=f'Your ride to {ride.drop} was rejected by {user.username}. Searching for another driver...'
             )
 
         return Response({
             "statusCode": "1",
-            "statusMessage": "Ride rejected, rider notified.",
-            "rider_name": ride.user.username if ride.user else None
+            "statusMessage": "Ride rejected",
+            "rejections_today": rejected_today,
+            "suspended": user.account_status == 'suspended',
+            "suspended_until": user.suspended_until,
         })
 
-  
+
 class SubmitRideFeedbackView(APIView):
     permission_classes = [permissions.IsAuthenticated]
  
@@ -859,7 +964,20 @@ class DriverRegisterView(APIView):
             **driver_data
         })
 
+class BookingStatusAPIView(APIView):
+    permission_classes =[permissions.IsAuthenticated]
+    def get(self, request, booking_id):
+        """
+        Get booking status by booking_id
+        """
+        try:
+            ride = Ride.objects.get(booking_id=booking_id)
+            serializer = RideStatusSerializer(ride)
+            return Response({"statusCode":"1","StatusMessage":"Booking Status","data":serializer.data})
+        except Ride.DoesNotExist:
+            return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
 
+from .utils import update_driver_incentive_progress    
 class RideStatusUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -897,7 +1015,7 @@ class RideStatusUpdateView(APIView):
             ride.status = 'accepted'
 
         elif new_status == 'completed':
-            if ride.status != 'accepted':
+            if ride.status not in ['accepted', 'ongoing']:
                 return Response({
                     "statusCode": "0",
                     "statusMessage": f"Ride cannot be completed because it is {ride.status}."
@@ -909,7 +1027,47 @@ class RideStatusUpdateView(APIView):
                 }, status=status.HTTP_403_FORBIDDEN)
             ride.status = 'completed'
             ride.completed = True
+            ride.completed_at = timezone.now()
+            ride.driver.is_available = True
+            ride.driver.save()
+            driver_earnings = Decimal(ride.driver_earnings)
+            driver_incentive = Decimal(ride.driver_incentive or 0)  # in case it's None
 
+            earning_amount = driver_earnings + driver_incentive  # Include incentives if needed
+            driver_wallet, created = DriverWallet.objects.get_or_create(driver=user)
+            driver_wallet.deposit(
+                amount=earning_amount,
+                description=f"Earnings for Ride {ride.booking_id or ride.id}",
+                transaction_type="ride_payment"
+            )
+
+            # 2️⃣ Update Admin Wallet for Commission and GST
+            admin_wallet,created  = AdminWallet.objects.get_or_create(name="Platform Wallet")  # Or use get_or_create_admin_wallet() utility
+            commission_amount = Decimal(ride.commission_amount)
+            gst_amount = Decimal(ride.gst_amount)
+            total_amount = commission_amount + gst_amount
+            if total_amount > 0:
+                # Update wallet balances
+                admin_wallet.balance += total_amount
+                admin_wallet.total_commission += commission_amount
+                admin_wallet.total_gst += gst_amount
+                admin_wallet.save()
+
+                # Create one combined transaction record
+                AdminWalletTransaction.objects.create(
+                    wallet=admin_wallet,
+                    transaction_type='revenue',  
+                    amount=total_amount,
+                    description=(
+                        f"Commission ₹{commission_amount} + GST ₹{gst_amount} "
+                        f"collected for Ride {ride.booking_id or ride.id}"
+                    ),
+                    balance_after=admin_wallet.balance,
+                    related_ride=ride,        
+                    related_user=ride.user,   
+                )
+
+            update_driver_incentive_progress(user, ride)
         elif new_status == 'cancelled':
             # Add your cancellation logic, e.g. who can cancel and when
             if ride.status in ['completed', 'cancelled']:
@@ -934,6 +1092,16 @@ class RideStatusUpdateView(APIView):
             "ride": serializer.data
         })
         
+from decimal import Decimal
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Sum, Avg
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import permissions
+
+from .models import Ride, User, AdminWallet, AdminWalletTransaction
+
 
 class AdminDashboardView(APIView):
     permission_classes = [permissions.IsAdminUser]
@@ -943,19 +1111,22 @@ class AdminDashboardView(APIView):
             today = timezone.now().date()
             week_ago = today - timedelta(days=6)
 
+            admin_wallet = AdminWallet.objects.first()  
+
             dashboard_stats = {
                 "activeRides": Ride.objects.filter(status='accepted').count(),
-                "totalRevenue": Payment.objects.filter(paid=True).aggregate(total=Sum('ride__fare'))['total'] or 0,
-                "revenueGrowth": self.calculate_revenue_growth(),
+                "totalRevenue": self.get_total_revenue(admin_wallet),
+                "revenueGrowth": self.calculate_revenue_growth(admin_wallet),
                 "totalUsers": User.objects.filter(is_user=True).count(),
                 "newUsersToday": User.objects.filter(is_user=True, date_joined__date=today).count(),
                 "totalDrivers": User.objects.filter(is_driver=True).count(),
                 "onlineDrivers": User.objects.filter(is_online=True).count(),
                 "todayRides": Ride.objects.filter(created_at__date=today).count(),
-                "todayRevenue": Payment.objects.filter(paid=True, ride__created_at__date=today).aggregate(total=Sum('ride__fare'))['total'] or 0,
+                "todayRevenue": self.get_today_revenue(admin_wallet, today),
                 "avgRating": Ride.objects.filter(rating__isnull=False).aggregate(avg=Avg('rating'))['avg'] or 0
             }
-            revenue_chart = self.get_revenue_chart_data(week_ago, today)
+
+            revenue_chart = self.get_revenue_chart_data(admin_wallet, week_ago, today)
             ride_chart = self.get_ride_chart_data(week_ago, today)
 
             return Response({
@@ -972,39 +1143,55 @@ class AdminDashboardView(APIView):
                 "statusMessage": f"Error retrieving dashboard data: {str(e)}"
             }, status=500)
 
-    def calculate_revenue_growth(self):
+    # --- Revenue calculations ---
+
+    def get_total_revenue(self, wallet):
+        return wallet.transactions.filter(transaction_type='revenue').aggregate(
+            total=Sum('amount')
+        )['total'] or Decimal("0.00")
+
+    def get_today_revenue(self, wallet, today):
+        return wallet.transactions.filter(
+            transaction_type='revenue',
+            created_at__date=today
+        ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+
+    def calculate_revenue_growth(self, wallet):
         today = timezone.now().date()
         current_week_start = today - timedelta(days=today.weekday())
         previous_week_start = current_week_start - timedelta(days=7)
-        
-        current_week_revenue = Payment.objects.filter(
-            paid=True,
-            ride__created_at__date__gte=current_week_start,
-            ride__created_at__date__lte=today
-        ).aggregate(total=Sum('ride__fare'))['total'] or 0
-        
-        previous_week_revenue = Payment.objects.filter(
-            paid=True,
-            ride__created_at__date__gte=previous_week_start,
-            ride__created_at__date__lte=previous_week_start + timedelta(days=6)
-        ).aggregate(total=Sum('ride__fare'))['total'] or 0
-        
-        if previous_week_revenue == 0:
-            return 0 if current_week_revenue == 0 else 100
-        return ((current_week_revenue - previous_week_revenue) / previous_week_revenue * 100)
 
-    def get_revenue_chart_data(self, start_date, end_date):
-        labels = [(start_date + timedelta(days=x)).strftime('%a') for x in range(7)]
+        current_week_revenue = wallet.transactions.filter(
+            transaction_type='revenue',
+            created_at__date__gte=current_week_start,
+            created_at__date__lte=today
+        ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+
+        previous_week_revenue = wallet.transactions.filter(
+            transaction_type='revenue',
+            created_at__date__gte=previous_week_start,
+            created_at__date__lte=previous_week_start + timedelta(days=6)
+        ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+
+        if previous_week_revenue == 0:
+            return 100 if current_week_revenue > 0 else 0
+        return ((current_week_revenue - previous_week_revenue) / previous_week_revenue) * 100
+
+    # --- Charts ---
+
+    def get_revenue_chart_data(self, wallet, start_date, end_date):
+        days = (end_date - start_date).days + 1
+        labels = [(start_date + timedelta(days=x)).strftime('%a') for x in range(days)]
         revenue_data = []
-        
-        for i in range(7):
+
+        for i in range(days):
             date = start_date + timedelta(days=i)
-            total = Payment.objects.filter(
-                paid=True,
-                ride__created_at__date=date
-            ).aggregate(total=Sum('ride__fare'))['total'] or 0
-            revenue_data.append(total)
-        
+            daily_total = wallet.transactions.filter(
+                transaction_type='revenue',
+                created_at__date=date
+            ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+            revenue_data.append(daily_total)
+
         return {
             "labels": labels,
             "revenue": revenue_data
@@ -1024,7 +1211,6 @@ class AdminDashboardView(APIView):
             "labels": labels,
             "rides": ride_data
         }
-
 
 from rest_framework import viewsets
 from .models import FareRule
@@ -1085,9 +1271,10 @@ def calculate_fare(vehicle_type, distance):
     for rule in rules:
         if rule.max_distance is None:  # "Above"
             if distance >= rule.min_distance:
-                return distance * rule.per_km_rate
+                return rule.calculate_fare(distance)
         elif rule.min_distance <= distance <= rule.max_distance:
-            return distance * rule.per_km_rate
+                return rule.calculate_fare(distance)
+
 
     return 0  # fallback if no rule matched
 
@@ -1145,7 +1332,8 @@ class CancelRideView(APIView):
             # Update ride status
             ride.status = 'cancelled'
             ride.save(update_fields=["status"])
-
+            ride.driver.is_available=True
+            ride.driver.save()
             # Notify other party (optional, if Notification model exists)
             if hasattr(models, "Notification"):
                 if request.user == ride.user and ride.driver:
@@ -1214,7 +1402,7 @@ class DistanceRewardAPIView(APIView):
         else:
             rewards = DistanceReward.objects.all().order_by("min_distance")
             serializer = DistanceRewardSerializer(rewards, many=True)
-        return Response(serializer.data)
+        return Response({"StatusCode":"1","StatusMessage":"Sucess","data":serializer.data})
 
     def post(self, request):
         serializer = DistanceRewardSerializer(data=request.data)
@@ -1298,8 +1486,8 @@ class DriverIncentiveView(APIView):
             # Fetch all incentives (global + drivers)
             records = DriverIncentive.objects.all()
 
-        serializer = DriverIncentiveSerializer(records, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        serializer = GetDriverIncentiveSerializer(records, many=True)
+        return Response({"StatusCode":"1","StatusMessage":"Sucess","data":serializer.data})
 
     def patch(self, request, driver_id=None):
         if driver_id:
@@ -1327,7 +1515,7 @@ class DriverIncentiveView(APIView):
                 }
             )
 
-        serializer = DriverIncentiveSerializer(record, data=request.data, partial=True)
+        serializer = GetDriverIncentiveSerializer(record, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -1484,7 +1672,18 @@ class UserVehicleTypeView(APIView):
             "statusMessage": "Vehicle types retrieved successfully",
             "vehicleTypes": serializer.data
         })    
-        
+
+class driverVehicleType(APIView):
+
+    def get(self, request):
+        vehicle_types = VehicleType.objects.all().order_by('name')
+        serializer = VehicleTypeSerializer(vehicle_types, many=True,context={'request': request})
+        return Response({
+            "statusCode": "1",
+            "statusMessage": "Vehicle types retrieved successfully",
+            "vehicleTypes": serializer.data
+        })
+
 class DriverOnlineStatusUpdateView(generics.UpdateAPIView):
     serializer_class = UserOnlineStatusSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -1653,4 +1852,130 @@ def send_new_ride_notification(token, ride_data):
     )
     response = messaging.send(message)
     print("Sent FCM:", response)
-      
+
+
+class RideReachedPickupView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, ride_id):
+        try:
+            ride = Ride.objects.get(id=ride_id, driver=request.user)
+        except Ride.DoesNotExist:
+            return Response(
+                {"error": "Ride not found or not assigned to you"},
+            )
+
+        # Only allow if ride is in accepted state
+        if ride.status != "accepted":
+            return Response(
+                {"error": "Ride cannot be marked as arrived in current status"},
+                
+            )
+
+        ride.status = "arrived"
+        ride.save()
+        customer_tokens = ride.user.fcm_token 
+        if customer_tokens:
+            customer_tokens = [customer_tokens]
+            notification = {
+                "title": "Driver Arrived 🚖",
+                "body": f"Your driver {ride.driver.username} has reached the pickup location."
+            }
+            data_payload = {
+                "ride_id": str(ride.id),
+                "booking_id": str(ride.booking_id),
+                "driver_name": ride.driver.username,
+                "driver_id": str(ride.driver.id),
+                "pickup_location": str(ride.pickup),
+                "drop_location": str(ride.drop),
+                "action": "DRIVER_ARRIVED"
+            }
+
+            try:
+                response = send_multicast(customer_tokens, notification=notification, data=data_payload)
+                print("Notification response:", response)
+                print("Success count:", response.success_count)
+                print("Failure count:", response.failure_count)
+
+                for idx, resp in enumerate(response.responses):
+                    if resp.success:
+                        print(f"Message {idx} sent successfully")
+                    else:
+                        print(f"Message {idx} failed with error: {resp.exception}")
+            except Exception as e:
+                logger.error(f"FCM send errors: {e}")
+        serializer = RideStatusSerializer(ride)
+        return Response(
+            {"StatusCode":1,"message": "Driver has reached pickup location", "ride": serializer.data},
+        )      
+        
+class StartRide(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, ride_id):
+        otp = request.data.get("otp")  # safe access
+
+        if not otp:
+            return Response(
+                {"StatusCode": 0, "ErrMessage": "OTP is required"},
+                status=400
+            )
+
+        try:
+            ride = Ride.objects.get(id=ride_id, driver=request.user)
+        except Ride.DoesNotExist:
+            return Response(
+                {"StatusCode": 0, "ErrMessage": "Ride not found or not assigned to you"},
+                status=404
+            )
+
+        if ride.status != "arrived":
+            return Response(
+                {"StatusCode": 0, "ErrMessage": "Ride cannot be started in current status"},
+                status=400
+            )
+
+        if ride.otp != otp:
+            return Response(
+                {"StatusCode": 0, "ErrMessage": "Invalid OTP"},
+                status=400
+            )
+
+        ride.status = "ongoing"
+        ride.save()
+        customer_tokens = ride.user.fcm_token
+        if customer_tokens:
+            customer_tokens = [customer_tokens]  
+
+            notification = {
+                "title": "Trip Started 🚖",
+                "body": f"Your ride from {ride.pickup} to {ride.drop} has started with {ride.driver.username}."
+            }
+            data_payload = {
+                "ride_id": str(ride.id),
+                "booking_id": str(ride.booking_id),
+                "driver_name": ride.driver.username,
+                "driver_id": str(ride.driver.id),
+                "pickup_location": str(ride.pickup),
+                "drop_location": str(ride.drop),
+                "action": "TRIP_STARTED"
+            }
+
+            try:
+                response = send_multicast(customer_tokens, notification=notification, data=data_payload)
+                print("Notification response:", response)
+                print("Success count:", response.success_count)
+                print("Failure count:", response.failure_count)
+
+                for idx, resp in enumerate(response.responses):
+                    if resp.success:
+                        print(f"Message {idx} sent successfully")
+                    else:
+                        print(f"Message {idx} failed with error: {resp.exception}")
+            except Exception as e:
+                logger.error(f"FCM send errors: {e}")
+        serializer = RideStatusSerializer(ride)
+        return Response(
+            {"StatusCode": 1, "message": "Ride started", "ride": serializer.data},
+            status=200
+        )

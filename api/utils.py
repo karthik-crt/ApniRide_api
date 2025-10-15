@@ -67,20 +67,44 @@ def haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
-def get_nearby_driver_tokens(pickup_lat, pickup_lng, radius_km=5):
+# def get_nearby_driver_tokens(pickup_lat, pickup_lng, radius_km=5):
+#     drivers = User.objects.exclude(fcm_token__isnull=True).exclude(fcm_token="")
+#     tokens = []
+#     for d in drivers:
+#         if d.current_lat and d.current_lng:
+#             dist = haversine(pickup_lat, pickup_lng, d.current_lat, d.current_lng)
+#             print(f"Driver {d.username}: {dist} km away")
+#             if dist <= radius_km:
+#                 tokens.append(d.fcm_token)
+#     print("Nearby drivers:", tokens)                
+#     return tokens
+
+def get_nearby_driver_tokens(pickup_lat, pickup_lng, radius_km=5, vehicle_type=None):
+    """
+    Returns FCM tokens for nearby drivers filtered by vehicle type (if given).
+    If vehicle_type == 'any' or None, all drivers are included.
+    """
+    # Base queryset: only drivers with valid FCM tokens
     drivers = User.objects.exclude(fcm_token__isnull=True).exclude(fcm_token="")
+
+    # Filter by vehicle_type unless it's "any" or empty
+    if vehicle_type and vehicle_type.lower() != "any":
+        drivers = drivers.filter(vehicle_type__iexact=vehicle_type)
+
     tokens = []
     for d in drivers:
         if d.current_lat and d.current_lng:
             dist = haversine(pickup_lat, pickup_lng, d.current_lat, d.current_lng)
-            print(f"Driver {d.username}: {dist} km away")
+            print(f"Driver {d.username}: {dist} km away ({getattr(d, 'vehicle_type', 'N/A')})")
             if dist <= radius_km:
                 tokens.append(d.fcm_token)
-    print("Nearby drivers:", tokens)                
+
+    print(f"Nearby {vehicle_type or 'all'} drivers:", tokens)
     return tokens
 
+
 def get_nearest_driver_distance(pickup_lat, pickup_lng):
-    drivers = User.objects.filter(is_driver=True)\
+    drivers = User.objects.filter(is_driver=True,is_available=True)\
                           .exclude(current_lat__isnull=True, current_lng__isnull=True)
     nearest_driver = None
     min_distance = None
@@ -92,3 +116,137 @@ def get_nearest_driver_distance(pickup_lat, pickup_lng):
             nearest_driver = driver
     
     return nearest_driver, min_distance
+
+
+from django.template.loader import render_to_string
+from xhtml2pdf import pisa
+import tempfile
+
+def generate_invoice_pdf(ride):
+    html = render_to_string('invoice_template.html', {'ride': ride})
+    
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as output:
+        pisa_status = pisa.CreatePDF(html, dest=output)
+        if pisa_status.err:
+            return None
+        return output.name
+    
+
+# utils.py
+from django.db.models import Avg, Count
+from .models import *
+
+def get_driver_rating_summary(driver_id):
+    ratings = DriverRating.objects.filter(driver_id=driver_id)
+
+    avg_rating = ratings.aggregate(Avg("stars"))["stars__avg"] or 0
+    total_reviews = ratings.count()
+
+    # Distribution (1-5 stars)
+    distribution = ratings.values("stars").annotate(count=Count("stars"))
+
+    return {
+        "avg_rating": round(avg_rating, 1),
+        "total_reviews": total_reviews,
+        "distribution": {d["stars"]: d["count"] for d in distribution},
+        "recent_feedback": ratings.order_by("-created_at")[:10],  # last 10 feedbacks
+    }
+
+from datetime import date
+from decimal import Decimal
+from django.db import transaction
+
+def update_driver_incentive_progress(driver, ride):
+    """
+    Update or create a DriverIncentiveProgress record after a ride is completed,
+    and credit incentive if earned but not already paid.
+    """
+    # Fetch active incentives for the ride type
+    active_incentives = DriverIncentive.objects.all()
+
+
+    driver_wallet, _ = DriverWallet.objects.get_or_create(driver=driver)
+
+    for incentive in active_incentives:
+        progress, _ = DriverIncentiveProgress.objects.get_or_create(
+            driver=driver,
+            incentive_rule=incentive,
+        )
+
+        # Update progress
+        progress.rides_completed += 1
+        progress.travelled_distance += ride.distance_km or 0
+
+        # Check if incentive is earned and not paid yet
+        incentive_earned = (
+            (incentive.days and progress.rides_completed >= incentive.days) or
+            (incentive.distance and progress.travelled_distance >= incentive.distance)
+        )
+
+        if incentive_earned and not progress.earned:
+            progress.earned = True
+            driver_wallet.deposit(
+                amount=incentive.driver_incentive,
+                description=f"Incentive Completed {ride.booking_id or ride.id}",
+                transaction_type="incentive_payment"
+            )
+            progress.earned = True  # Mark as credited
+
+        progress.save()
+
+
+#Admin
+
+
+def get_or_create_admin_wallet():
+    wallet, created = AdminWallet.objects.get_or_create(name="Platform Main Wallet")
+    return wallet
+
+def calculate_ride_commission(ride_amount, commission_percentage=10):
+    if not isinstance(ride_amount, Decimal):
+        ride_amount = Decimal(ride_amount)
+    commission = (ride_amount * Decimal(commission_percentage)) / Decimal(100)
+    return commission.quantize(Decimal('0.01'))
+
+def calculate_ride_gst(ride_amount, gst_percentage=5):
+    if not isinstance(ride_amount, Decimal):
+        ride_amount = Decimal(ride_amount)
+    gst = (ride_amount * Decimal(gst_percentage)) / Decimal(100)
+    return gst.quantize(Decimal('0.01'))
+
+def process_ride_payment(ride, ride_amount, driver_wallet, commission_percentage=10, gst_percentage=5):
+    admin_wallet = get_or_create_admin_wallet()
+    
+    commission = calculate_ride_commission(ride_amount, commission_percentage)
+    gst = calculate_ride_gst(ride_amount, gst_percentage)
+    driver_earnings = ride_amount - commission - gst
+    
+    try:
+        # Collect Commission & GST
+        admin_wallet.collect_commission(commission, ride=ride, description=f"Commission from ride #{ride.id}")
+        admin_wallet.collect_gst(gst, ride=ride, description=f"GST from ride #{ride.id}")
+        
+        # Pay driver
+        driver_wallet.deposit(driver_earnings, description=f"Earnings from ride #{ride.id}", transaction_type="ride_payment")
+        return True, "Payment processed successfully"
+    except Exception as e:
+        return False, f"Payment processing failed: {str(e)}"
+
+
+
+
+def refund_ride_amount(ride, user_wallet, refund_amount, refund_commission=Decimal("0.00"), refund_gst=Decimal("0.00")):
+    admin_wallet = get_or_create_admin_wallet()
+    
+    try:
+        admin_wallet.refund_to_user(
+            amount=refund_amount,
+            user_wallet=user_wallet,
+            description=f"Refund for ride #{ride.id}",
+            ride=ride,
+            refund_commission=refund_commission,
+            refund_gst=refund_gst
+        )
+        return True, "Refund processed successfully"
+    except Exception as e:
+        return False, f"Refund failed: {str(e)}"
