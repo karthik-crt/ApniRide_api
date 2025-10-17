@@ -104,7 +104,7 @@ def get_nearby_driver_tokens(pickup_lat, pickup_lng, radius_km=5, vehicle_type=N
 
 
 def get_nearest_driver_distance(pickup_lat, pickup_lng):
-    drivers = User.objects.filter(is_driver=True,is_available=True)\
+    drivers = User.objects.filter(is_driver=True,is_available=True,is_online=True)\
                           .exclude(current_lat__isnull=True, current_lng__isnull=True)
     nearest_driver = None
     min_distance = None

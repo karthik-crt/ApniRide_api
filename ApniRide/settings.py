@@ -27,10 +27,10 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'documents')
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-jy3x&@mfb7!bdg77%6gxl1iau2pe96euv!+%y42aet0kq1_7dp'
+SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG')
 
 ALLOWED_HOSTS = ["*"]
 
@@ -180,14 +180,14 @@ WSGI_APPLICATION = 'ApniRide.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'apniride',
-        'USER': 'root',
-        'PASSWORD': 'mysql',
-        'HOST': '127.0.0.1',
-        'PORT': '3306', 
+        'NAME': os.getenv('DB_NAME'),
+        'USER': os.getenv('DB_USER'),
+        'PASSWORD': os.getenv('DB_PASSWORD'),
+        'HOST': os.getenv('DB_HOST'),
+        'PORT': os.getenv('DB_PORT'), 
     }
 }
-
+print("os.getenv('DB_PASSWORD')",os.getenv('DB_PASSWORD'))
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -275,7 +275,6 @@ PAYMENT_API = lambda: API_KEYS["payment_api_key"]
 # FIREBASE_SERVICE_ACCOUNT_PATH = "E:/Cab/Cab-New/ApniRide-Backend/firebase_service_account.json"
 
 FIREBASE_SERVICE_ACCOUNT_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH",os.path.join(BASE_DIR, "firebase_service_account.json"))
-
 
 
 import ApniRide.firebase_app
