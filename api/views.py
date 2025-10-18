@@ -38,7 +38,7 @@ from .models import DriverLocation  # Ensure this model exists
 logger = logging.getLogger(__name__)
 
 class RegisterView(generics.CreateAPIView):
-    serializer_class = UserRegisterSerializer
+    serializer_class = AdminRegisterSerializer
     permission_classes = [permissions.AllowAny]
 
     def create(self, request, *args, **kwargs):
