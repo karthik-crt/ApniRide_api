@@ -1112,7 +1112,13 @@ class AdminDashboardView(APIView):
             week_ago = today - timedelta(days=6)
 
             admin_wallet = AdminWallet.objects.first()  
-
+            if not admin_wallet:
+                admin_wallet = AdminWallet.objects.create(
+                    name="Platform Wallet",
+                    balance=Decimal("0.00"),
+                    total_commission=Decimal("0.00"),
+                    total_gst=Decimal("0.00")
+                )
             dashboard_stats = {
                 "activeRides": Ride.objects.filter(status='accepted').count(),
                 "totalRevenue": self.get_total_revenue(admin_wallet),
