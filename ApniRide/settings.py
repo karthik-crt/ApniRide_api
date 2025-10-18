@@ -37,10 +37,12 @@ ALLOWED_HOSTS = ["*"]
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:2000",
     "http://localhost:4200",
+    "https://admin.apniride.org"
 ]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:4200",
     "http://127.0.0.1:4200",
+    "https://admin.apniride.org"
 ]
 # Application definition
 LOGGING = {
