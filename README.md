@@ -1,7 +1,7 @@
 ApniRide Django Project
 How to Run ApniRide
 1. Clone the Repository
-git clone <your-repo-url>
+git clone https://github.com/karthik-crt/ApniRide_api.git
 cd ApniRide
 
 2. Create Virtual Environment & Install Dependencies
