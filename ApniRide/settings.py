@@ -277,6 +277,3 @@ PAYMENT_API = lambda: API_KEYS["payment_api_key"]
 # FIREBASE_SERVICE_ACCOUNT_PATH = "E:/Cab/Cab-New/ApniRide-Backend/firebase_service_account.json"
 
 FIREBASE_SERVICE_ACCOUNT_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH",os.path.join(BASE_DIR, "firebase_service_account.json"))
-
-
-import ApniRide.firebase_app
