@@ -104,6 +104,7 @@ class WalletDepositView(generics.GenericAPIView):
 from .razorpay import withdraw_to_driver
 from decimal import Decimal
 
+
 class WalletWithdrawView(generics.GenericAPIView):
     serializer_class = WalletTransactionSerializer
     permission_classes = [IsAuthenticated]
