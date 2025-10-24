@@ -105,7 +105,6 @@ from .razorpay import withdraw_to_driver
 from decimal import Decimal
 
 class WalletWithdrawView(generics.GenericAPIView):
-    """Withdraw money from wallet"""
     serializer_class = WalletTransactionSerializer
     permission_classes = [IsAuthenticated]
 
@@ -116,7 +115,9 @@ class WalletWithdrawView(generics.GenericAPIView):
 
         wallet, _ = DriverWallet.objects.get_or_create(driver=request.user)
         amount = serializer.validated_data["amount"]
-
+        beneficiary_name = request.user.username  
+        account_number = request.data.get("account_number")
+        ifsc = request.data.get("ifsc")
         try:
             wallet.withdraw(amount)
         except ValueError as e:
@@ -132,16 +133,18 @@ class WalletWithdrawView(generics.GenericAPIView):
         result = withdraw_to_driver(
             driver_wallet=driver_wallet,
             amount=Decimal(request.data.get("amount", 0)),
-            beneficiary_name="request.user",
-            account_number="4111111111111111",
-            ifsc="HDFC0000001"
+            beneficiary_name=beneficiary_name,
+            account_number=account_number,
+            ifsc=ifsc
         )
-
+        print("withdraw result",result)
+        
         if result['success']:
             print("Withdraw successful! New balance:", result['balance'])
             print("Payout ID:", result['payout_id'])
         else:
             print("Withdraw failed:", result['error'])
+
         # Explicit StatusCode for success
         return Response({
             "StatusCode": "1",

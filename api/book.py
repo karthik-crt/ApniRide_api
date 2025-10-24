@@ -334,7 +334,7 @@ class BookRideView(generics.CreateAPIView):
             try:
                 response = send_multicast(tokens, notification=notification, data=data_payload)
                 print(f"Notification response: {response}")
-                logger.info(f"📨 Instant ride notification sent for ride {ride.id}")
+                logger.info(f"Instant ride notification sent for ride {ride.id}")
             except Exception as e:
                 logger.error(f"FCM send error for ride {ride.id}: {e}")
 

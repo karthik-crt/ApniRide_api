@@ -189,7 +189,7 @@ DATABASES = {
         'PORT': os.getenv('DB_PORT'), 
     }
 }
-print("os.getenv('DB_PASSWORD')",os.getenv('DB_PASSWORD'))
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -257,6 +257,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 RAZORPAY_KEY_ID=os.getenv('RAZORPAY_KEY_ID')
 RAZORPAY_KEY_SECRET=os.getenv('RAZORPAY_KEY_SECRET')
+RAZORPAY_ACCOUNT_NO=os.getenv('RAZORPAY_ACCOUNT_NO')
 
 AUTH_USER_MODEL = 'api.User'
 

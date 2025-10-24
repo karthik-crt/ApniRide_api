@@ -80,7 +80,7 @@ class LoginView(APIView):
                 "statusMessage": "Invalid credentials"
             })
 
-        user = authenticate(username=user.username, password=password)
+        user = authenticate(email=user.email, password=password)
         
         if not user:
             return Response({
@@ -1269,20 +1269,99 @@ class FareRuleViewSet(viewsets.ModelViewSet):
     queryset = FareRule.objects.all()
     serializer_class = serializers.FareRuleSerializer
         
+# def calculate_fare(vehicle_type, distance):
+#     from .models import FareRule
+    
+#     rules = FareRule.objects.filter(vehicle_type=vehicle_type).order_by("min_distance")
+
+#     for rule in rules:
+#         if rule.max_distance is None:  # "Above"
+#             if distance >= rule.min_distance:
+#                 return rule.calculate_fare(distance)
+#         elif rule.min_distance <= distance <= rule.max_distance:
+#                 return rule.calculate_fare(distance)
+
+
+#     return 0  # fallback if no rule matched
+
+# def calculate_fare(vehicle_type, distance):
+#     from .models import FareRule
+    
+#     rules = FareRule.objects.filter(vehicle_type=vehicle_type).order_by("min_distance")
+#     total_fare = 0
+#     remaining_distance = distance
+
+#     for rule in rules:
+#         # Find distance range for this rule
+#         max_dist = rule.max_distance if rule.max_distance else remaining_distance
+
+#         # Calculate how much distance falls in this slab
+#         if remaining_distance > 0:
+#             applicable_distance = min(remaining_distance, max_dist - rule.min_distance + 1)
+#             total_fare += applicable_distance * rule.per_km_rate
+#             remaining_distance -= applicable_distance
+
+#         # Stop if full distance covered
+#         if remaining_distance <= 0:
+#             break
+
+#     return round(total_fare, 2)
+
 def calculate_fare(vehicle_type, distance):
     from .models import FareRule
-    
+
     rules = FareRule.objects.filter(vehicle_type=vehicle_type).order_by("min_distance")
 
+    totals = {
+        "distance": distance,
+        "base_fare": 0,
+        "gst_amount": 0,
+        "commission_amount": 0,
+        "driver_earnings": 0,
+        "total_user_pays": 0,
+        "company_revenue": 0,
+        "government_revenue": 0,
+        "breakdown": []
+    }
+
+    remaining_distance = distance
+
     for rule in rules:
-        if rule.max_distance is None:  # "Above"
-            if distance >= rule.min_distance:
-                return rule.calculate_fare(distance)
-        elif rule.min_distance <= distance <= rule.max_distance:
-                return rule.calculate_fare(distance)
+        if remaining_distance <= 0:
+            break
 
+        # Distance applicable for this slab
+        max_dist = rule.max_distance if rule.max_distance else remaining_distance + rule.min_distance
+        applicable_distance = min(remaining_distance, max_dist - rule.min_distance)
 
-    return 0  # fallback if no rule matched
+        if applicable_distance <= 0:
+            continue
+
+        # Use model's calculate_fare() for this slab
+        slab_result = rule.calculate_fare(applicable_distance)
+
+        # Add to breakdown
+        totals["breakdown"].append({
+            "range": f"{rule.min_distance}-{rule.max_distance or '∞'} km",
+            "distance": applicable_distance,
+            "fare": round(slab_result["total_user_pays"], 3),
+        })
+
+        # Accumulate totals
+        for key in ["base_fare", "gst_amount", "commission_amount",
+                    "driver_earnings", "total_user_pays",
+                    "company_revenue", "government_revenue"]:
+            totals[key] += slab_result[key]
+
+        remaining_distance -= applicable_distance
+
+    # Round final values
+    for key, value in totals.items():
+        if isinstance(value, (float, int)):
+            totals[key] = round(value, 3)
+
+    return totals
+
 
         
 from django.db.models import Q

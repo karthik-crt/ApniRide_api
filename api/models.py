@@ -10,8 +10,11 @@ APPROVAL_CHOICES = [
     ('rejected', 'Rejected'),
 ]
 class User(AbstractUser):
+    username = models.CharField(max_length=150,unique=False,blank=True,null=True)
     is_driver = models.IntegerField(default=0, blank=True, null=True)
     email = models.EmailField(unique=True)
+    USERNAME_FIELD = "email"   # ✅ this is the key line
+    REQUIRED_FIELDS = []
     mobile = models.CharField(max_length=50, default='', blank=True, null=True)
     is_user = models.IntegerField(default=0, blank=True, null=True)
     profile_photo = models.FileField(upload_to='profile_photos/', null=True, blank=True)
@@ -176,16 +179,13 @@ class FareRule(models.Model):
         Calculate fare breakdown for a given distance.
         Returns a dict with detailed breakdown for user, driver, and company.
         """
-        if self.max_distance is None or (self.min_distance <= distance <= self.max_distance):
+        if distance > 0:
             # Calculate base components
             base_fare = distance * self.per_km_rate
             commission_amount = (base_fare * self.commission_percentage) / 100
             driver_earnings = base_fare - commission_amount
-            
-            # GST is applied to the base fare (the service value)
             gst_amount = (base_fare * self.gst_percentage) / 100
-            
-            # What user pays (base fare + GST)
+        
             total_user_pays = base_fare + gst_amount
 
             return {
@@ -366,8 +366,6 @@ class DriverWallet(models.Model):
         return self.balance
 
     def withdraw(self, amount, description="Withdrawal", transaction_type="withdrawal"):
-        """Withdraw if balance is sufficient and log transaction"""
-        print("Wallet payment failed. Please try another method",dir(self))
         if not isinstance(self.balance, Decimal):
             self.balance = Decimal(self.balance)
         if not isinstance(amount, Decimal):
