@@ -13,7 +13,7 @@ class User(AbstractUser):
     username = models.CharField(max_length=150,unique=False,blank=True,null=True)
     is_driver = models.IntegerField(default=0, blank=True, null=True)
     email = models.EmailField(unique=True)
-    USERNAME_FIELD = "email"   # ✅ this is the key line
+    USERNAME_FIELD = "email" 
     REQUIRED_FIELDS = []
     mobile = models.CharField(max_length=50, default='', blank=True, null=True)
     is_user = models.IntegerField(default=0, blank=True, null=True)
@@ -207,6 +207,12 @@ class DistanceReward(models.Model):
         blank=True,
         null=True,
         help_text="Enter vehicle type (admin can add new types dynamically)"
+    )
+    vehicle_image = models.ImageField(
+        upload_to='vehicle_images/',
+        null=True,
+        blank=True,
+        help_text="Upload vehicle image"
     )
     min_distance = models.FloatField()
     max_distance = models.FloatField(null=True, blank=True)  

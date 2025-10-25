@@ -1480,17 +1480,18 @@ from django.shortcuts import get_object_or_404
 
 # DistanceReward API
 class DistanceRewardAPIView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
     def get(self, request, pk=None):
         if pk:
             reward = get_object_or_404(DistanceReward, pk=pk)
-            serializer = DistanceRewardSerializer(reward)
+            serializer = DistanceRewardSerializer(reward, context={'request': request})
         else:
             rewards = DistanceReward.objects.all().order_by("min_distance")
-            serializer = DistanceRewardSerializer(rewards, many=True)
+            serializer = DistanceRewardSerializer(rewards, many=True, context={'request': request})
         return Response({"StatusCode":"1","StatusMessage":"Sucess","data":serializer.data})
 
     def post(self, request):
-        serializer = DistanceRewardSerializer(data=request.data)
+        serializer = DistanceRewardSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -1498,7 +1499,7 @@ class DistanceRewardAPIView(APIView):
 
     def patch(self, request, pk):
         reward = get_object_or_404(DistanceReward, pk=pk)
-        serializer = DistanceRewardSerializer(reward, data=request.data, partial=True)
+        serializer = DistanceRewardSerializer(reward, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)

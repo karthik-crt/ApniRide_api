@@ -140,10 +140,17 @@ from rest_framework import serializers
 from .models import DistanceReward, TourismOffer,DriverIncentive
 
 class DistanceRewardSerializer(serializers.ModelSerializer):
+    vehicle_image_url = serializers.SerializerMethodField(read_only=True)
     class Meta:
         model = DistanceReward
         fields = "__all__"
-
+    def get_vehicle_image_url(self, obj):
+        request = self.context.get('request')
+        if obj.vehicle_image:
+            if request:
+                return request.build_absolute_uri(obj.vehicle_image.url)
+            return obj.vehicle_image.url
+        return None
 class TourismOfferSerializer(serializers.ModelSerializer):
     class Meta:
         model = TourismOffer
