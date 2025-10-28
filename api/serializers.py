@@ -457,3 +457,24 @@ class DriverIncentiveProgressSerializer(serializers.ModelSerializer):
 
     def get_progress_percent(self, obj):
         return obj.progress_percent
+    
+class AdminWalletTransactionSerializer(serializers.ModelSerializer):
+    transaction_type_display = serializers.CharField(source='get_transaction_type_display', read_only=True)
+    related_user_name = serializers.CharField(source='related_user.username', read_only=True)
+    related_ride_id = serializers.IntegerField(source='related_ride.id', read_only=True)
+
+    class Meta:
+        model = AdminWalletTransaction
+        fields = [
+            'id',
+            'transaction_type',
+            'transaction_type_display',
+            'amount',
+            'commission_amount',
+            'gst_amount',
+            'balance_after',
+            'description',
+            'related_user_name',
+            'related_ride_id',
+            'created_at',
+        ]    

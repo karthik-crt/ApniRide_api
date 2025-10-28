@@ -220,6 +220,8 @@ class DistanceReward(models.Model):
     water_bottles = models.IntegerField(default=0)
     tea = models.IntegerField(default=0)
     discount = models.CharField(max_length=100, blank=True, null=True)
+    heading = models.CharField(max_length=150, blank=True, null=True)
+    message = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.min_distance}-{self.max_distance} km Reward"
@@ -570,12 +572,26 @@ class AdminWalletTransaction(models.Model):
 
     wallet = models.ForeignKey(AdminWallet, on_delete=models.CASCADE, related_name='transactions')
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
-    amount = models.DecimalField(max_digits=12, decimal_places=2)  # Positive for credit, negative for debit
+    amount = models.DecimalField(max_digits=12, decimal_places=2)  # Total amount (commission + GST)
+    commission_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    gst_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     description = models.TextField(blank=True, null=True)
     balance_after = models.DecimalField(max_digits=12, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
-    related_ride = models.ForeignKey('Ride', on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_wallet_transactions')
-    related_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_transactions')
+    related_ride = models.ForeignKey(
+        'Ride', on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_wallet_transactions'
+    )
+    related_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='admin_transactions'
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Admin Wallet Transaction"
+        verbose_name_plural = "Admin Wallet Transactions"
+
+    def __str__(self):
+        return f"Admin {self.transaction_type} - ₹{self.amount} (Commission: ₹{self.commission_amount}, GST: ₹{self.gst_amount})"
 
     class Meta:
         ordering = ['-created_at']

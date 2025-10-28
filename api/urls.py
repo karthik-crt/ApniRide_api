@@ -5,6 +5,7 @@ from .driver_earning import *
 from .driver_rating import *
 from .users import *
 from .book import BookRideView
+from .revenue import AdminWalletTransactionListAPI
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
@@ -106,6 +107,7 @@ urlpatterns = [
     path("wallet/deposit/", WalletDepositView.as_view(), name="wallet-deposit"),
     path("wallet/withdraw/", WalletWithdrawView.as_view(), name="wallet-withdraw"),
     path('driver/wallet/transactions/', DriverWalletTransactionHistoryView.as_view()),
+    path('admin/transactions/', AdminWalletTransactionListAPI.as_view(), name='admin_transactions_api'),
     # Logout
     path('logout', LogoutView.as_view()),
     

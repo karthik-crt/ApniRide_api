@@ -1056,16 +1056,16 @@ class RideStatusUpdateView(APIView):
                 # Create one combined transaction record
                 AdminWalletTransaction.objects.create(
                     wallet=admin_wallet,
-                    transaction_type='revenue',  
-                    amount=total_amount,
-                    description=(
-                        f"Commission ₹{commission_amount} + GST ₹{gst_amount} "
-                        f"collected for Ride {ride.booking_id or ride.id}"
-                    ),
+                    transaction_type='revenue',
+                    amount=total_amount,  # commission + gst
+                    commission_amount=commission_amount,
+                    gst_amount=gst_amount,
+                    description=f"Commission ₹{commission_amount} + GST ₹{gst_amount} collected for Ride {ride.booking_id or ride.id}",
                     balance_after=admin_wallet.balance,
-                    related_ride=ride,        
-                    related_user=ride.user,   
+                    related_ride=ride,
+                    related_user=ride.user,
                 )
+
 
             update_driver_incentive_progress(user, ride)
         elif new_status == 'cancelled':
@@ -1119,9 +1119,23 @@ class AdminDashboardView(APIView):
                     total_commission=Decimal("0.00"),
                     total_gst=Decimal("0.00")
                 )
+            # dashboard_stats = {
+            #     "activeRides": Ride.objects.filter(status='accepted').count(),
+            #     "totalRevenue": self.get_total_revenue(admin_wallet),
+            #     "revenueGrowth": self.calculate_revenue_growth(admin_wallet),
+            #     "totalUsers": User.objects.filter(is_user=True).count(),
+            #     "newUsersToday": User.objects.filter(is_user=True, date_joined__date=today).count(),
+            #     "totalDrivers": User.objects.filter(is_driver=True).count(),
+            #     "onlineDrivers": User.objects.filter(is_online=True).count(),
+            #     "todayRides": Ride.objects.filter(created_at__date=today).count(),
+            #     "todayRevenue": self.get_today_revenue(admin_wallet, today),
+            #     "avgRating": Ride.objects.filter(rating__isnull=False).aggregate(avg=Avg('rating'))['avg'] or 0
+            # }
             dashboard_stats = {
                 "activeRides": Ride.objects.filter(status='accepted').count(),
                 "totalRevenue": self.get_total_revenue(admin_wallet),
+                "totalCommission": admin_wallet.total_commission,
+                "totalGST": admin_wallet.total_gst,
                 "revenueGrowth": self.calculate_revenue_growth(admin_wallet),
                 "totalUsers": User.objects.filter(is_user=True).count(),
                 "newUsersToday": User.objects.filter(is_user=True, date_joined__date=today).count(),
@@ -1131,6 +1145,7 @@ class AdminDashboardView(APIView):
                 "todayRevenue": self.get_today_revenue(admin_wallet, today),
                 "avgRating": Ride.objects.filter(rating__isnull=False).aggregate(avg=Avg('rating'))['avg'] or 0
             }
+
 
             revenue_chart = self.get_revenue_chart_data(admin_wallet, week_ago, today)
             ride_chart = self.get_ride_chart_data(week_ago, today)
@@ -1153,35 +1168,65 @@ class AdminDashboardView(APIView):
 
     def get_total_revenue(self, wallet):
         return wallet.transactions.filter(transaction_type='revenue').aggregate(
-            total=Sum('amount')
-        )['total'] or Decimal("0.00")
+                total=Sum('commission_amount')
+            )['total'] or Decimal("0.00")
 
     def get_today_revenue(self, wallet, today):
         return wallet.transactions.filter(
             transaction_type='revenue',
             created_at__date=today
-        ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+        ).aggregate(total=Sum('commission_amount'))['total'] or Decimal("0.00")
+
+    # def calculate_revenue_growth(self, wallet):
+    #     today = timezone.now().date()
+    #     current_week_start = today - timedelta(days=today.weekday())
+    #     previous_week_start = current_week_start - timedelta(days=7)
+
+    #     current_week_revenue = wallet.transactions.filter(
+    #         transaction_type='revenue',
+    #         created_at__date__gte=current_week_start,
+    #         created_at__date__lte=today
+    #     ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+
+    #     previous_week_revenue = wallet.transactions.filter(
+    #         transaction_type='revenue',
+    #         created_at__date__gte=previous_week_start,
+    #         created_at__date__lte=previous_week_start + timedelta(days=6)
+    #     ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+
+    #     if previous_week_revenue == 0:
+    #         return 100 if current_week_revenue > 0 else 0
+    #     return ((current_week_revenue - previous_week_revenue) / previous_week_revenue) * 100
 
     def calculate_revenue_growth(self, wallet):
         today = timezone.now().date()
-        current_week_start = today - timedelta(days=today.weekday())
-        previous_week_start = current_week_start - timedelta(days=7)
+        last_7_days = today - timedelta(days=6)
+        prev_7_days = last_7_days - timedelta(days=7)
 
-        current_week_revenue = wallet.transactions.filter(
+        # Get current and previous 7-day revenues (only commission part)
+        current_revenue = wallet.transactions.filter(
             transaction_type='revenue',
-            created_at__date__gte=current_week_start,
+            created_at__date__gte=last_7_days,
             created_at__date__lte=today
-        ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+        ).aggregate(total=Sum('commission_amount'))['total'] or Decimal("0.00")
 
-        previous_week_revenue = wallet.transactions.filter(
+        previous_revenue = wallet.transactions.filter(
             transaction_type='revenue',
-            created_at__date__gte=previous_week_start,
-            created_at__date__lte=previous_week_start + timedelta(days=6)
-        ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
+            created_at__date__gte=prev_7_days,
+            created_at__date__lte=last_7_days - timedelta(days=1)
+        ).aggregate(total=Sum('commission_amount'))['total'] or Decimal("0.00")
 
-        if previous_week_revenue == 0:
-            return 100 if current_week_revenue > 0 else 0
-        return ((current_week_revenue - previous_week_revenue) / previous_week_revenue) * 100
+        # --- Best practice for dashboards ---
+        # If there was no revenue in the previous period,
+        # show 0% (to avoid misleading 100% jumps)
+        if previous_revenue == 0:
+            return Decimal("0.00")
+
+        # Standard % growth formula
+        growth = ((current_revenue - previous_revenue) / previous_revenue) * 100
+        return round(growth, 2)
+
+
 
     # --- Charts ---
 
