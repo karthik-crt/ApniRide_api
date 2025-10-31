@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 from rest_framework import serializers
 
-from .models import Ride, Payment, DriverWallet
+from .models import Ride, Payment, DriverWallet,DistanceReward
 from .utils import (
     calculate_distance,
     get_nearby_driver_tokens, 
@@ -195,7 +195,7 @@ class BookRideView(generics.CreateAPIView):
         pickup_to_drop_km = distance_km  # Already calculated
 
         print(f"Pickup to Drop distance (km): {pickup_to_drop_km}")
-        
+        reward = Usercashback(distance_km,vehicle_type)
         # Save ride and handle payment within transaction
         with transaction.atomic():
             ride = serializer.save(
@@ -218,6 +218,7 @@ class BookRideView(generics.CreateAPIView):
                 vehicle_type=vehicle_type,
                 booking_id=booking_id,
                 payment_type = payment_type,
+                customer_reward = reward,
                 status='pending',  # Default status
                 paid=False  # Will be updated in payment handling
             )
@@ -327,6 +328,7 @@ class BookRideView(generics.CreateAPIView):
                 "pickup_to_drop_km": str(round(distance_km, 2)),
                 "excepted_earnings":str(round(ride.driver_earnings,0)),
                 "user_number":ride.user.mobile,
+                "pickup_time":str(ride.pickup_time),
                 "action": "NEW_RIDE"
             }
 
@@ -378,4 +380,40 @@ class BookRideView(generics.CreateAPIView):
 
         return Response(response_data, status=status.HTTP_201_CREATED)
     
+def Usercashback(km, vehicle_type):
+    try:
+        cashback_amount = 0
+        reward_details = None
+        rules = DistanceReward.objects.filter(vehicle_type__iexact=vehicle_type)
+
+        for rule in rules:
+            if rule.min_distance <= km <= (rule.max_distance or 999999):  
+                cashback_amount = rule.cashback
+                reward_details = rule
+                break
+
+        if cashback_amount > 0 and reward_details:
+            return {
+                "status": True,
+                "cashback": reward_details.cashback,
+                "water_bottles": reward_details.water_bottles,
+                "tea": reward_details.tea,
+                "heading": reward_details.heading,
+                "message": reward_details.message,
+                "vehicle_image": reward_details.vehicle_image.url if reward_details.vehicle_image else None
+            }
+        else:
+            return {
+                "status": False,
+                "cashback": 0,
+                "water_bottles": 0,
+                "tea": 0,
+                "heading": None,
+                "message": None,
+                "vehicle_image": None
+            }
+
+    except Exception as e:
+        return {"status": False, "error": str(e)}
+
     

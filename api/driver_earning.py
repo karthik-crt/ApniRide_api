@@ -93,7 +93,26 @@ class WalletDepositView(generics.GenericAPIView):
 
         wallet, _ = DriverWallet.objects.get_or_create(driver=request.user)
         amount = serializer.validated_data["amount"]
-        wallet.deposit(amount)
+        ride_id = request.data.get("ride_id" or None)
+        if ride_id:
+            try:
+                ride = Ride.objects.get(id=ride_id) 
+            except Ride.DoesNotExist:
+                return Response({
+                    "StatusCode": "0",
+                    "message": f"Ride with id {ride_id} not found"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            cashback_amount = Decimal(amount)
+            wallet.add_cashback(
+                amount=cashback_amount,
+                ride=ride, 
+                description=f"Cashback credited for Ride {ride_id}",
+            )
+            message = "Cashback credited successfully"
+        else:
+            wallet.deposit(amount)
+            message = "Deposit successful"
 
         return Response({
             "StatusCode": "1",
@@ -157,7 +176,9 @@ class WalletWithdrawView(generics.GenericAPIView):
 
 # views.py
 
-from rest_framework import generics, permissions
+from datetime import datetime, timedelta
+from django.utils import timezone
+from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import UserWalletTransaction, DriverWallet
@@ -167,25 +188,75 @@ class DriverWalletTransactionHistoryView(generics.ListAPIView):
     serializer_class = UserWalletTransactionSerializer
     permission_classes = [IsAuthenticated]
 
+    def make_aware_if_naive(self, dt):
+        """Safely make a datetime aware if it's naive"""
+        if timezone.is_naive(dt):
+            return timezone.make_aware(dt)
+        return dt
+
     def get_queryset(self):
-        # Only return transactions for the logged-in driver
         driver = self.request.user
-        return UserWalletTransaction.objects.filter(wallet__driver=driver).order_by('-created_at')
+        queryset = UserWalletTransaction.objects.filter(wallet__driver=driver).order_by('-created_at')
+
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        filter_type = self.request.query_params.get('filter_type')
+
+    
+        if not start_date and not end_date and not filter_type:
+            return queryset
+
+      
+        if start_date and end_date:
+            try:
+                start_date = datetime.strptime(start_date, "%Y-%m-%d")
+                end_date = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+                start_date = self.make_aware_if_naive(start_date)
+                end_date = self.make_aware_if_naive(end_date)
+                queryset = queryset.filter(created_at__range=[start_date, end_date])
+            except ValueError:
+                pass
+
+       
+        elif filter_type:
+            now = timezone.now()
+
+            if filter_type.lower() == 'daily':
+                start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                end = now.replace(hour=23, minute=59, second=59)
+                queryset = queryset.filter(created_at__range=[start, end])
+
+            elif filter_type.lower() == 'weekly':
+                start = now - timedelta(days=now.weekday())  # Monday
+                end = start + timedelta(days=7)
+                queryset = queryset.filter(created_at__range=[start, end])
+
+            elif filter_type.lower() == 'monthly':
+                start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                if now.month == 12:
+                    end = start.replace(year=now.year + 1, month=1)
+                else:
+                    end = start.replace(month=now.month + 1)
+                queryset = queryset.filter(created_at__range=[start, end])
+
+        return queryset
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         wallet = DriverWallet.objects.filter(driver=request.user).first()
         current_balance = wallet.balance if wallet else 0
+
         return Response({
-            "StatusCode":"1",
-            "StatusMessage":"Sucess",
-            "data":{
-            "driver": request.user.username,
-            "current_balance": current_balance,
-            "transactions": serializer.data
+            "StatusCode": "1",
+            "StatusMessage": "Success",
+            "data": {
+                "driver": request.user.username,
+                "current_balance": current_balance,
+                "transactions": serializer.data
             }
         })
+
     
 from rest_framework.views import APIView
 from rest_framework.response import Response

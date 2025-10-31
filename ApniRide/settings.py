@@ -239,12 +239,22 @@ USE_TZ = True
 from celery.schedules import crontab
 
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
+from celery.schedules import crontab
+
 CELERY_BEAT_SCHEDULE = {
+    # Midnight reset
     'reset-earned-every-day-midnight': {
         'task': 'api.tasks.reset_earned_field',
         'schedule': crontab(hour=0, minute=0),  # 12:00 AM daily
     },
+
+    # Auto-cancel pending rides
+    'auto-cancel-pending-rides-every-5-minutes': {
+        'task': 'api.tasks.auto_cancel_pending_rides',
+        'schedule': crontab(minute='*/5'),  # every 5 minutes
+    },
 }
+
 
 
 # https://docs.djangoproject.com/en/5.2/howto/static-files/

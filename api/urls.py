@@ -4,8 +4,9 @@ from .views import *
 from .driver_earning import *
 from .driver_rating import *
 from .users import *
+from .refund import *
 from .book import BookRideView
-from .revenue import AdminWalletTransactionListAPI
+from .revenue import *
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
@@ -65,7 +66,7 @@ urlpatterns = [
     path('payments/', AdminPaymentListView.as_view()),
     path('payments', PaymentListView.as_view(), name='payment-list'),
     path('payments/<int:payment_id>/adjust/', AdjustFareView.as_view(), name='adjust-fare'),
-    path('refund-requests/', RefundRequestListView.as_view(), name='refund-request-list'),
+    path('refund-payment', PaymentRefundView.as_view()),
     path('refund-requests/<int:refund_id>/issue/', IssueRefundView.as_view(), name='issue-refund'),
     path('drivers/location/<int:driver_id>/', AdminDriverLocationView.as_view()),
     path('notifications/send/', AdminSendNotificationView.as_view()),
@@ -108,6 +109,8 @@ urlpatterns = [
     path("wallet/withdraw/", WalletWithdrawView.as_view(), name="wallet-withdraw"),
     path('driver/wallet/transactions/', DriverWalletTransactionHistoryView.as_view()),
     path('admin/transactions/', AdminWalletTransactionListAPI.as_view(), name='admin_transactions_api'),
+    path('user/wallet/transactions/', PaymentHistoryView.as_view(), name='user_wallet_transactions_api'),
+    path('cancellation-policies/', CancellationPolicyListCreate.as_view(), name='cancellation-policies-list'),
     # Logout
     path('logout', LogoutView.as_view()),
     

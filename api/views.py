@@ -358,6 +358,7 @@ class AcceptRideView(APIView):
             ride.otp = random.randint(1000,9999)
             ride.status = 'accepted'
             ride.driver = request.user
+            ride.driver.is_available = False
             ride.save()
             request.user.is_available = False
             request.user.save()
@@ -977,7 +978,8 @@ class BookingStatusAPIView(APIView):
         except Ride.DoesNotExist:
             return Response({"error": "Booking not found"}, status=status.HTTP_404_NOT_FOUND)
 
-from .utils import update_driver_incentive_progress    
+from .utils import update_driver_incentive_progress  
+from .tasks import notify_ride_status  
 class RideStatusUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1027,13 +1029,14 @@ class RideStatusUpdateView(APIView):
                 }, status=status.HTTP_403_FORBIDDEN)
             ride.status = 'completed'
             ride.completed = True
+            ride.paid = True
             ride.completed_at = timezone.now()
             ride.driver.is_available = True
             ride.driver.save()
             driver_earnings = Decimal(ride.driver_earnings)
-            driver_incentive = Decimal(ride.driver_incentive or 0)  # in case it's None
+            driver_incentive = Decimal(ride.driver_incentive or 0)  
 
-            earning_amount = driver_earnings + driver_incentive  # Include incentives if needed
+            earning_amount = driver_earnings + driver_incentive  
             driver_wallet, created = DriverWallet.objects.get_or_create(driver=user)
             driver_wallet.deposit(
                 amount=earning_amount,
@@ -1041,23 +1044,22 @@ class RideStatusUpdateView(APIView):
                 transaction_type="ride_payment"
             )
 
-            # 2️⃣ Update Admin Wallet for Commission and GST
-            admin_wallet,created  = AdminWallet.objects.get_or_create(name="Platform Wallet")  # Or use get_or_create_admin_wallet() utility
+            admin_wallet,created  = AdminWallet.objects.get_or_create(name="Platform Wallet")  
             commission_amount = Decimal(ride.commission_amount)
             gst_amount = Decimal(ride.gst_amount)
             total_amount = commission_amount + gst_amount
             if total_amount > 0:
-                # Update wallet balances
+                
                 admin_wallet.balance += total_amount
                 admin_wallet.total_commission += commission_amount
                 admin_wallet.total_gst += gst_amount
                 admin_wallet.save()
 
-                # Create one combined transaction record
+               
                 AdminWalletTransaction.objects.create(
                     wallet=admin_wallet,
                     transaction_type='revenue',
-                    amount=total_amount,  # commission + gst
+                    amount=total_amount,  
                     commission_amount=commission_amount,
                     gst_amount=gst_amount,
                     description=f"Commission ₹{commission_amount} + GST ₹{gst_amount} collected for Ride {ride.booking_id or ride.id}",
@@ -1069,22 +1071,75 @@ class RideStatusUpdateView(APIView):
 
             update_driver_incentive_progress(user, ride)
         elif new_status == 'cancelled':
-            # Add your cancellation logic, e.g. who can cancel and when
-            if ride.status in ['completed', 'cancelled']:
+            if ride.status in ['completed', 'cancelled', 'cancelled_by_user']:
                 return Response({
                     "statusCode": "0",
                     "statusMessage": f"Ride cannot be cancelled because it is {ride.status}."
                 }, status=status.HTTP_400_BAD_REQUEST)
-            # Allow driver or passenger to cancel (example)
+
             if ride.driver != user and ride.user != user:
                 return Response({
                     "statusCode": "0",
                     "statusMessage": "You are not authorized to cancel this ride."
                 }, status=status.HTTP_403_FORBIDDEN)
-            ride.status = 'cancelled'
+
+            # Cancellation policy
+            policy = CancellationPolicy.objects.filter(is_active=True).first()
+            cancelled_count = Ride.objects.filter(user=ride.user, is_cancelled_by_user=True).count()
+            charge = Decimal(policy.charge_amount) if cancelled_count >= policy.free_cancellations else Decimal("0.00")
+
+            ride_wallet = ride.user.wallet
+            admin_wallet, _ = AdminWallet.objects.get_or_create(name="Platform Wallet")
+
+            # Deduct from user wallet (can go negative)
+            if charge > 0:
+                ride_wallet.balance -= charge
+                ride_wallet.save(update_fields=["balance", "updated_at"])
+                # Log user wallet transaction
+                UserWalletTransaction.objects.create(
+                    wallet=ride_wallet,
+                    transaction_type="ride_payment",
+                    amount=-charge,
+                    description=f"Cancellation charge for Ride {ride.id}",
+                    balance_after=ride_wallet.balance,
+                    related_ride=ride
+                )
+                # Deposit into admin wallet
+                admin_wallet.deposit(
+                    charge,
+                    description=f"Cancellation charge from {ride.user.username} for Ride {ride.id}",
+                    transaction_type="revenue"
+                )
+                Ride.objects.filter(
+                    user=ride.user,
+                    is_cancelled_by_user=True,
+                    cancellation_charge=0,
+                    status='cancelled_by_user'
+                ).update(is_cancelled_by_user=False)
+                ride.cancellation_charge = charge
+                charge_status = "charged from wallet (wallet can go negative)"
+            else:
+                ride.cancellation_charge = 0
+                charge_status = "free cancellation"
+
+            # Update ride
+            ride.status = 'cancelled_by_user'
+            ride.is_cancelled_by_user = True
+            ride.cancelled_at = timezone.now()
+            ride.save()
+            notify_ride_status(ride)
+
+            return Response({
+                "statusCode": "1",
+                "statusMessage": "Ride cancelled successfully",
+                "cancellation_charge": ride.cancellation_charge,
+                "user_wallet_balance": ride_wallet.balance,
+                "charge_status": charge_status,
+                "remaining_free_cancellations": max(policy.free_cancellations - cancelled_count - 1, 0)
+            }, status=status.HTTP_200_OK)
 
         ride.save()
-
+        notify_ride_status(ride)
         serializer = RideSerializer(ride)
         return Response({
             "statusCode": "1",
@@ -1119,18 +1174,6 @@ class AdminDashboardView(APIView):
                     total_commission=Decimal("0.00"),
                     total_gst=Decimal("0.00")
                 )
-            # dashboard_stats = {
-            #     "activeRides": Ride.objects.filter(status='accepted').count(),
-            #     "totalRevenue": self.get_total_revenue(admin_wallet),
-            #     "revenueGrowth": self.calculate_revenue_growth(admin_wallet),
-            #     "totalUsers": User.objects.filter(is_user=True).count(),
-            #     "newUsersToday": User.objects.filter(is_user=True, date_joined__date=today).count(),
-            #     "totalDrivers": User.objects.filter(is_driver=True).count(),
-            #     "onlineDrivers": User.objects.filter(is_online=True).count(),
-            #     "todayRides": Ride.objects.filter(created_at__date=today).count(),
-            #     "todayRevenue": self.get_today_revenue(admin_wallet, today),
-            #     "avgRating": Ride.objects.filter(rating__isnull=False).aggregate(avg=Avg('rating'))['avg'] or 0
-            # }
             dashboard_stats = {
                 "activeRides": Ride.objects.filter(status='accepted').count(),
                 "totalRevenue": self.get_total_revenue(admin_wallet),
@@ -1177,26 +1220,6 @@ class AdminDashboardView(APIView):
             created_at__date=today
         ).aggregate(total=Sum('commission_amount'))['total'] or Decimal("0.00")
 
-    # def calculate_revenue_growth(self, wallet):
-    #     today = timezone.now().date()
-    #     current_week_start = today - timedelta(days=today.weekday())
-    #     previous_week_start = current_week_start - timedelta(days=7)
-
-    #     current_week_revenue = wallet.transactions.filter(
-    #         transaction_type='revenue',
-    #         created_at__date__gte=current_week_start,
-    #         created_at__date__lte=today
-    #     ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
-
-    #     previous_week_revenue = wallet.transactions.filter(
-    #         transaction_type='revenue',
-    #         created_at__date__gte=previous_week_start,
-    #         created_at__date__lte=previous_week_start + timedelta(days=6)
-    #     ).aggregate(total=Sum('amount'))['total'] or Decimal("0.00")
-
-    #     if previous_week_revenue == 0:
-    #         return 100 if current_week_revenue > 0 else 0
-    #     return ((current_week_revenue - previous_week_revenue) / previous_week_revenue) * 100
 
     def calculate_revenue_growth(self, wallet):
         today = timezone.now().date()
@@ -1314,43 +1337,6 @@ class FareRuleViewSet(viewsets.ModelViewSet):
     queryset = FareRule.objects.all()
     serializer_class = serializers.FareRuleSerializer
         
-# def calculate_fare(vehicle_type, distance):
-#     from .models import FareRule
-    
-#     rules = FareRule.objects.filter(vehicle_type=vehicle_type).order_by("min_distance")
-
-#     for rule in rules:
-#         if rule.max_distance is None:  # "Above"
-#             if distance >= rule.min_distance:
-#                 return rule.calculate_fare(distance)
-#         elif rule.min_distance <= distance <= rule.max_distance:
-#                 return rule.calculate_fare(distance)
-
-
-#     return 0  # fallback if no rule matched
-
-# def calculate_fare(vehicle_type, distance):
-#     from .models import FareRule
-    
-#     rules = FareRule.objects.filter(vehicle_type=vehicle_type).order_by("min_distance")
-#     total_fare = 0
-#     remaining_distance = distance
-
-#     for rule in rules:
-#         # Find distance range for this rule
-#         max_dist = rule.max_distance if rule.max_distance else remaining_distance
-
-#         # Calculate how much distance falls in this slab
-#         if remaining_distance > 0:
-#             applicable_distance = min(remaining_distance, max_dist - rule.min_distance + 1)
-#             total_fare += applicable_distance * rule.per_km_rate
-#             remaining_distance -= applicable_distance
-
-#         # Stop if full distance covered
-#         if remaining_distance <= 0:
-#             break
-
-#     return round(total_fare, 2)
 
 def calculate_fare(vehicle_type, distance):
     from .models import FareRule
@@ -1438,6 +1424,66 @@ def calculate_incentives_and_rewards(distance, vehicle_type=None):
 
     return driver_incentive, customer_reward
         
+# class CancelRideView(APIView):
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def post(self, request, ride_id):
+#         try:
+#             ride = get_object_or_404(Ride, id=ride_id)
+
+#             # Prevent cancelling completed or already cancelled rides
+#             if ride.status in ['completed', 'cancelled']:
+#                 return Response({
+#                     "statusCode": "0",
+#                     "statusMessage": f"Ride cannot be cancelled because it is {ride.status}."
+#                 }, status=status.HTTP_400_BAD_REQUEST)
+
+#             # Only rider (user) or driver assigned can cancel
+#             if ride.user != request.user and ride.driver != request.user:
+#                 return Response({
+#                     "statusCode": "0",
+#                     "statusMessage": "You are not authorized to cancel this ride."
+#                 }, status=status.HTTP_403_FORBIDDEN)
+
+#             # Update ride status
+#             ride.status = 'cancelled'
+#             ride.save(update_fields=["status"])
+#             ride.driver.is_available=True
+#             ride.driver.save()
+#             notify_ride_status(ride)
+#             # Notify other party (optional, if Notification model exists)
+#             if hasattr(models, "Notification"):
+#                 if request.user == ride.user and ride.driver:
+#                     Notification.objects.create(
+#                         user=ride.driver,
+#                         title='Ride Cancelled',
+#                         message=f'Ride {ride.id} has been cancelled by {ride.user.username}.'
+#                     )
+#                 elif request.user == ride.driver:
+#                     Notification.objects.create(
+#                         user=ride.user,
+#                         title='Ride Cancelled',
+#                         message=f'Your ride {ride.id} was cancelled by driver {ride.driver.username}.'
+#                     )
+
+#             serializer = RideSerializer(ride)
+#             return Response({
+#                 "statusCode": "1",
+#                 "statusMessage": "Ride cancelled successfully.",
+#                 "ride": serializer.data
+#             }, status=status.HTTP_200_OK)
+
+#         except Exception as e:
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": f"Error cancelling ride: {str(e)}"
+#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)      
+            
+
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Q
+
 class CancelRideView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -1462,9 +1508,15 @@ class CancelRideView(APIView):
             # Update ride status
             ride.status = 'cancelled'
             ride.save(update_fields=["status"])
-            ride.driver.is_available=True
-            ride.driver.save()
-            # Notify other party (optional, if Notification model exists)
+
+            # Make driver available if cancelled by user
+            if ride.driver:
+                ride.driver.is_available = True
+                ride.driver.save(update_fields=["is_available"])
+
+            notify_ride_status(ride)
+
+            # Notify other party
             if hasattr(models, "Notification"):
                 if request.user == ride.user and ride.driver:
                     Notification.objects.create(
@@ -1479,6 +1531,30 @@ class CancelRideView(APIView):
                         message=f'Your ride {ride.id} was cancelled by driver {ride.driver.username}.'
                     )
 
+            # --- DRIVER SUSPENSION LOGIC ---
+            if request.user == ride.driver:
+                # Count cancellations in last 24 hours
+                since = timezone.now() - timedelta(hours=24)
+                cancelled_count = Ride.objects.filter(
+                    driver=ride.driver,
+                    status='cancelled',
+                    updated_at__gte=since
+                ).count()
+
+                if cancelled_count >= 3:
+                    ride.driver.account_status = "suspended"
+                    ride.driver.suspended_until = timezone.now() + timedelta(days=1)
+                    ride.driver.is_available = False
+                    ride.driver.save(update_fields=["account_status", "suspended_until", "is_available"])
+                    
+                    # Notify driver about suspension
+                    if hasattr(models, "Notification"):
+                        Notification.objects.create(
+                            user=ride.driver,
+                            title='Account Suspended',
+                            message='Your account has been suspended for 1 day due to multiple ride cancellations.'
+                        )
+
             serializer = RideSerializer(ride)
             return Response({
                 "statusCode": "1",
@@ -1490,8 +1566,7 @@ class CancelRideView(APIView):
             return Response({
                 "statusCode": "0",
                 "statusMessage": f"Error cancelling ride: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)      
-            
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
           
 
@@ -2074,6 +2149,7 @@ class StartRide(APIView):
 
         ride.status = "ongoing"
         ride.save()
+        notify_ride_status(ride)
         customer_tokens = ride.user.fcm_token
         if customer_tokens:
             customer_tokens = [customer_tokens]  

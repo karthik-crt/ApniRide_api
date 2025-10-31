@@ -50,6 +50,11 @@ class LiveTrackingConsumer(AsyncWebsocketConsumer):
             "longitude": event["longitude"]
         }))
 
+    async def ride_status_update(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "ride_status",
+            "status": event["status"]
+        }))
 
 #For driver location update
 import json

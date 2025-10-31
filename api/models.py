@@ -72,6 +72,8 @@ class Ride(models.Model):
         ('ongoing','Ongoing'),
         ('completed', 'Completed'),
         ('rejected', 'Rejected'),
+        ('auto_cancelled', 'Auto Cancelled'),
+        ('cancelled_by_user','Cancelled by User'),
     ]
     user = models.ForeignKey(User, related_name='rides', on_delete=models.CASCADE)
     driver = models.ForeignKey(User, related_name='assigned_rides', null=True, blank=True, on_delete=models.SET_NULL)
@@ -100,12 +102,17 @@ class Ride(models.Model):
     completed = models.BooleanField(default=False)
     paid = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     otp = models.CharField(max_length=6, null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     coupon_applied = models.CharField(max_length=20, null=True, blank=True)
     rating = models.IntegerField(null=True, blank=True)
     feedback = models.TextField(null=True, blank=True)
     rejected_by = models.ManyToManyField(User, related_name='rejected_rides', blank=True)
+    is_cancelled_by_user = models.BooleanField(default=False)
+    cancellation_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    pending_cancellation_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Ride {self.id} - {self.user.username} ({self.status})"
@@ -382,18 +389,60 @@ class DriverWallet(models.Model):
         if self.balance >= amount:
             self.balance -= amount
             self.save(update_fields=["balance", "updated_at"])
-            
             # Log transaction
             UserWalletTransaction.objects.create(
                 wallet=self,
                 transaction_type=transaction_type,
-                amount=-amount,  # Negative for withdrawal
+                amount=-amount,  
                 description=description,
                 balance_after=self.balance
             )
             
             return self.balance
         raise ValueError("Insufficient balance")
+    
+    def add_incentive(self, amount,transaction_type ,ride=None, description="Driver Incentive"):
+        if not isinstance(amount, Decimal):
+            amount = Decimal(amount)
+
+        self.balance += amount
+        self.save(update_fields=["balance", "updated_at"])
+
+        # Log transaction
+        UserWalletTransaction.objects.create(
+            wallet=self,
+            transaction_type=transaction_type,  # or "cashback"
+            amount=amount,
+            description=description,
+            balance_after=self.balance,
+            related_ride=ride if ride else None
+        )
+
+        return self.balance
+    def add_cashback(self, amount, ride, description="Cashback Reward"):
+        """
+        Add a cashback amount to the driver's wallet.
+        Example use cases:
+            - Cashback on ride completion
+            - Promotional wallet recharge cashback
+        """
+        if not isinstance(amount, Decimal):
+            amount = Decimal(amount)
+
+        self.balance += amount
+        self.save(update_fields=["balance", "updated_at"])
+
+        # Log transaction
+        UserWalletTransaction.objects.create(
+            wallet=self,
+            transaction_type="cashback",
+            amount=amount,
+            description=description,
+            balance_after=self.balance,
+            related_ride=ride if ride else None
+        )
+
+        return self.balance
 
     def __str__(self):
         return f"{self.driver.username}'s Wallet - Balance: {self.balance}"
@@ -407,6 +456,7 @@ class UserWalletTransaction(models.Model):
         ('reward', 'Reward'),
         ('ride_payment', 'Ride Payment Debited'),
         ('refund', 'Refund Credited'),
+        ('driver_incentive', 'Driver Incentive'),
     ]
     
     wallet = models.ForeignKey(DriverWallet, on_delete=models.CASCADE, related_name='transactions')
@@ -600,3 +650,12 @@ class AdminWalletTransaction(models.Model):
 
     def __str__(self):
         return f"Admin {self.transaction_type} - ₹{self.amount} (Balance: {self.balance_after})"
+
+# models.py
+class CancellationPolicy(models.Model):
+    charge_amount = models.DecimalField(max_digits=10, decimal_places=2, default=50)  # charge per cancelled ride
+    free_cancellations = models.IntegerField(default=0)  # number of free cancellations per user
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"Charge: {self.charge_amount}, Free cancellations: {self.free_cancellations}"

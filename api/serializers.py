@@ -27,28 +27,40 @@ class AdminRegisterSerializer(serializers.ModelSerializer):
         user = User.objects.create_superuser(**validated_data)
         return user
 
-# class RideSerializer(serializers.ModelSerializer):
-#     username = serializers.CharField(source="user.username", read_only=True)
-#     driver_name = serializers.CharField(source="driver.username", read_only=True)
+class UserWalletHistorySerializer(serializers.ModelSerializer):
+    customer_reward = serializers.SerializerMethodField()
+    booking_id = serializers.SerializerMethodField()
+    driver_id = serializers.SerializerMethodField()
+    class Meta:
+        model = UserWalletTransaction
+        fields = [
+            'id',
+            'transaction_type',
+            'amount',
+            'description',
+            'balance_after',
+            'created_at',
+            'wallet',
+            'related_ride',
+            'customer_reward', 
+            'booking_id',
+            'driver_id'
+        ]
 
-#     class Meta:
-#         model = Ride
-#         fields = '__all__'
-#         read_only_fields = [
-#             'user','driver','status','fare','completed',
-#             'paid','created_at','completed_at'
-#         ]
-#         # Add the extra fields to output
-#         extra_fields = ['username', 'driver_name']
-
-#     def to_representation(self, instance):
-#         # include both default + extra fields
-#         rep = super().to_representation(instance)
-#         rep['username'] = instance.user.username if instance.user else None
-#         rep['driver_name'] = instance.driver.username if instance.driver else None
-#         return rep
-
-
+    def get_customer_reward(self, obj):
+        if obj.related_ride:
+            return getattr(obj.related_ride, 'customer_reward', None)
+        return None
+    
+    def get_booking_id(self, obj):
+        if obj.related_ride:
+            return getattr(obj.related_ride, 'booking_id', None)
+        return None
+    def get_driver_id(self, obj):
+        if obj.related_ride and obj.related_ride.driver_id:
+            return obj.related_ride.driver_id
+        return None
+    
 class RideSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     usernumber = serializers.CharField(source="user.mobile", read_only=True)
@@ -118,7 +130,7 @@ class AdminRideSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'pickup', 'drop', 'fare', 'status', 'completed', 'paid',
             'created_at', 'completed_at', 'rating', 'feedback', 'user', 'driver',
-            'userName', 'driverName', 'rejectedByIds','pickup_lat','pickup_lng','drop_lat','drop_lng'
+            'userName', 'driverName', 'rejectedByIds','pickup_lat','pickup_lng','drop_lat','drop_lng','booking_id'
         ]    
 
 class DriverPingSerializer(serializers.ModelSerializer):
@@ -301,17 +313,20 @@ class RideStatusSerializer(serializers.ModelSerializer):
     otp = serializers.SerializerMethodField()
     driver_number = serializers.SerializerMethodField()
     vechicle_name = serializers.SerializerMethodField()
-
+    user_name = serializers.SerializerMethodField()
     class Meta:
         model = Ride
         fields = [
             'booking_id', 'status', 'pickup', 'drop', 'pickup_time',
             'driver_name', 'driver_number', 'vechicle_name',
             'driver_photo', 'vehicle_number', 'otp',
-            'fare', 'completed', 'paid','vehicle_type','gst_amount','payment_type'
+            'fare', 'completed', 'paid','vehicle_type','gst_amount','payment_type','pickup_lat', 'pickup_lng','drop_lat','drop_lng','user_name'
         ]
     def get_driver_name(self, obj):
         return obj.driver.username if obj.driver else None
+
+    def get_user_name(self, obj):
+        return obj.user.username if obj.user else None
 
     def get_driver_photo(self, obj):
         if obj.driver and obj.driver.profile_photo:
@@ -478,3 +493,10 @@ class AdminWalletTransactionSerializer(serializers.ModelSerializer):
             'related_ride_id',
             'created_at',
         ]    
+
+
+
+class CancellationPolicySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CancellationPolicy
+        fields = '__all__'        

@@ -69,3 +69,34 @@ def send_scheduled_ride_notification(ride_id):
         logger.error(f"Ride {ride_id} not found for scheduled notification.")
     except Exception as e:
         logger.error(f"Error sending scheduled ride notification for ride {ride_id}: {e}")
+
+from datetime import timedelta
+
+@shared_task
+def auto_cancel_pending_rides():
+    print("Auto cancelling pending rides task started.")
+    """Auto-cancel rides pending for more than 30 minutes."""
+    cutoff_time = timezone.now() - timedelta(minutes=30)
+    pending_rides = Ride.objects.filter(status='pending', created_at__lt=cutoff_time)
+
+    count = 0
+    for ride in pending_rides:
+        ride.status = 'auto_cancelled'
+        ride.save(update_fields=['status'])
+        logger.info(f"Ride {ride.id} auto-cancelled (user={ride.user.username})")
+        count += 1
+
+    return f"{count} rides auto-cancelled."
+
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+def notify_ride_status(ride):
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"ride_{ride.id}",   # same group as location
+        {
+            "type": "ride_status_update",
+            "status": ride.status
+        }
+    )

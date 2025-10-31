@@ -182,13 +182,12 @@ def update_driver_incentive_progress(driver, ride):
             (incentive.days and progress.rides_completed >= incentive.days) or
             (incentive.distance and progress.travelled_distance >= incentive.distance)
         )
-
         if incentive_earned and not progress.earned:
             progress.earned = True
-            driver_wallet.deposit(
+            driver_wallet.add_incentive(
                 amount=incentive.driver_incentive,
-                description=f"Incentive Completed {ride.booking_id or ride.id}",
-                transaction_type="incentive_payment"
+                transaction_type = "driver_incentive",
+                description=f"Incentive completed by Driver #{ride.driver.id} for Ride #{ride.booking_id}"
             )
             progress.earned = True  # Mark as credited
 
