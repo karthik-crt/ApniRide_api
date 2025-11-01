@@ -10,6 +10,7 @@ from .revenue import *
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
+from .cancel_ride import *
 
 router = DefaultRouter()
 router.register(r'vehicle-types', VehicleTypeViewSet, basename='vehicle-type')
@@ -29,8 +30,12 @@ urlpatterns = [
     path('rides/feedback/<int:ride_id>/', SubmitRideFeedbackView.as_view()),
     path("rides/<int:ride_id>/arrived/", RideReachedPickupView.as_view()),
     path("ride/<int:ride_id>/ongoing/",StartRide.as_view()),
+    # Cancel ride by driver
     path("rides/<int:ride_id>/cancel/", CancelRideView.as_view()),
     
+    # Cancel ride by user
+    path('user-cancel-ride/<int:ride_id>/',UserCancelRideViews.as_view(),name="test-cancel-ride"),
+
     path("booking/status/<str:booking_id>", BookingStatusAPIView.as_view()),
     # Driver
     path('driver/<int:pk>/online-status/', DriverOnlineStatusUpdateView.as_view()),
