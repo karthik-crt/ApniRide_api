@@ -180,3 +180,8 @@ class RideLocationConsumer(AsyncWebsocketConsumer):
             "lng": event["lng"]
         }))
 
+    async def ride_status_update(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "ride_status",
+            "status": event["status"]
+        }))

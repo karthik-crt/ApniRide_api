@@ -156,18 +156,54 @@ from datetime import date
 from decimal import Decimal
 from django.db import transaction
 
+# def update_driver_incentive_progress(driver, ride):
+#     """
+#     Update or create a DriverIncentiveProgress record after a ride is completed,
+#     and credit incentive if earned but not already paid.
+#     """
+#     # Fetch active incentives for the ride type
+#     active_incentives = DriverIncentive.objects.all()
+
+
+#     driver_wallet, _ = DriverWallet.objects.get_or_create(driver=driver)
+
+#     for incentive in active_incentives:
+#         progress, _ = DriverIncentiveProgress.objects.get_or_create(
+#             driver=driver,
+#             incentive_rule=incentive,
+#         )
+
+#         # Update progress
+#         progress.rides_completed += 1
+#         progress.travelled_distance += ride.distance_km or 0
+
+#         # Check if incentive is earned and not paid yet
+#         incentive_earned = (
+#             (incentive.days and progress.rides_completed >= incentive.days) or
+#             (incentive.distance and progress.travelled_distance >= incentive.distance)
+#         )
+#         if incentive_earned and not progress.earned:
+#             progress.earned = True
+#             driver_wallet.add_incentive(
+#                 amount=incentive.driver_incentive,
+#                 transaction_type = "driver_incentive",
+#                 description=f"Incentive completed by Driver #{ride.driver.id} for Ride #{ride.booking_id}"
+#             )
+#             progress.earned = True  # Mark as credited
+
+#         progress.save()
+
 def update_driver_incentive_progress(driver, ride):
-    """
-    Update or create a DriverIncentiveProgress record after a ride is completed,
-    and credit incentive if earned but not already paid.
-    """
-    # Fetch active incentives for the ride type
+    driver_wallet, _ = DriverWallet.objects.get_or_create(driver=driver)
     active_incentives = DriverIncentive.objects.all()
 
-
-    driver_wallet, _ = DriverWallet.objects.get_or_create(driver=driver)
-
     for incentive in active_incentives:
+        ride_type_for_incentive = get_ride_type(ride.distance_km, incentive)
+
+        # Skip incentives that don't match the current ride
+        if ride_type_for_incentive is None:
+            continue
+
         progress, _ = DriverIncentiveProgress.objects.get_or_create(
             driver=driver,
             incentive_rule=incentive,
@@ -177,22 +213,40 @@ def update_driver_incentive_progress(driver, ride):
         progress.rides_completed += 1
         progress.travelled_distance += ride.distance_km or 0
 
-        # Check if incentive is earned and not paid yet
+        # Check if incentive earned
         incentive_earned = (
             (incentive.days and progress.rides_completed >= incentive.days) or
             (incentive.distance and progress.travelled_distance >= incentive.distance)
         )
+
         if incentive_earned and not progress.earned:
-            progress.earned = True
             driver_wallet.add_incentive(
                 amount=incentive.driver_incentive,
-                transaction_type = "driver_incentive",
-                description=f"Incentive completed by Driver #{ride.driver.id} for Ride #{ride.booking_id}"
+                transaction_type="driver_incentive",
+                ride=ride,
+                description=f"Incentive completed by Driver #{driver.id} for Ride #{ride.booking_id}"
             )
-            progress.earned = True  # Mark as credited
-
+            progress.earned = True
+        print("Incentive Progress:", progress.rides_completed, progress.travelled_distance, progress.earned)
         progress.save()
 
+
+def get_ride_type(travelled_distance, incentive):
+    """
+    Determine the ride type for this incentive.
+    """
+    if incentive.distance is None:
+        return "city"
+    elif incentive.ride_type == "city_distance":
+        # For city_distance incentives with min/max km
+        if incentive.distance <= travelled_distance <= (incentive.max_distance or float('inf')):
+            return "city_distance"
+        else:
+            return None
+    elif incentive.distance < travelled_distance < (incentive.max_distance or float('inf')):
+        return "long"
+    else:
+        return "tourist"
 
 #Admin
 

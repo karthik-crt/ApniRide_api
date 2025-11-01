@@ -261,6 +261,8 @@ class DriverIncentive(models.Model):
     )
     ride_type = models.CharField(max_length=20)
     distance = models.FloatField(null=True, blank=True)
+    max_distance = models.FloatField(null=True, blank=True)
+    rides_count = models.IntegerField(null=True, blank=True)
     days = models.IntegerField(null=True, blank=True)
     driver_incentive = models.DecimalField(max_digits=10, decimal_places=2)
     details = models.TextField()
@@ -270,6 +272,8 @@ class DriverIncentive(models.Model):
         if self.driver:
             return f"Incentive for {self.driver} ({self.ride_type})"
         return f"Global Incentive ({self.ride_type})"
+    
+    
 class RefundRequest(models.Model):
     STATUS_CHOICES = [
         ('requested', 'Requested'),

@@ -189,6 +189,8 @@ class GetDriverIncentiveSerializer(serializers.ModelSerializer):
             'distance',
             'min_rides',        # renamed from 'days'
             'driver_incentive',
+            'max_distance',
+            'rides_count',
             'details',
             'created_at',
         ]
@@ -259,7 +261,7 @@ class AdminRideHistorySerializer(serializers.ModelSerializer):
             'fare', 'driver_incentive', 'customer_reward', 'status',
             'completed', 'paid', 'created_at', 'completed_at',
             'rating', 'feedback', 'driver_name', 'user_name',
-            'payment', 'refund_requests'
+            'payment', 'refund_requests','booking_id'
         ]      
         
 class UserOnlineStatusSerializer(serializers.ModelSerializer):
@@ -272,7 +274,7 @@ class UserSerializer(serializers.ModelSerializer):
     profile_photo_upload = serializers.FileField(write_only=True, required=False)
     class Meta:
         model = User
-        fields = ['username', 'profile_photo','profile_photo_upload', 'mobile', 'emergency_contact_number','approval_state', 'preferred_payment_method']
+        fields = ['username', 'profile_photo','profile_photo_upload','suspended_until','account_status', 'mobile', 'emergency_contact_number','approval_state', 'preferred_payment_method']
         
     def get_profile_photo(self, obj):
         request = self.context.get("request")
@@ -477,6 +479,7 @@ class AdminWalletTransactionSerializer(serializers.ModelSerializer):
     transaction_type_display = serializers.CharField(source='get_transaction_type_display', read_only=True)
     related_user_name = serializers.CharField(source='related_user.username', read_only=True)
     related_ride_id = serializers.IntegerField(source='related_ride.id', read_only=True)
+    booking_id = serializers.CharField(source='related_ride.booking_id', read_only=True)
 
     class Meta:
         model = AdminWalletTransaction
@@ -491,6 +494,7 @@ class AdminWalletTransactionSerializer(serializers.ModelSerializer):
             'description',
             'related_user_name',
             'related_ride_id',
+            'booking_id',
             'created_at',
         ]    
 

@@ -169,7 +169,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import ValidationError
 from django.utils import timezone
 from .utils import calculate_distance,get_nearby_driver_tokens,get_nearest_driver_distance
-from ApniRide.firebase_app import send_multicast,send_fcm_notification
+from ApniRide.firebase_app import send_multicast,send_fcm_notification,send_Offer
 
 class BookRideViews(generics.CreateAPIView):
     serializer_class = RideSerializer
@@ -986,7 +986,7 @@ class RideStatusUpdateView(APIView):
     def post(self, request, ride_id):
         user = request.user
         new_status = request.data.get('status')
-
+        print("request data:", request.data)
         if new_status not in ['accepted', 'completed', 'cancelled']:
             return Response({
                 "statusCode": "0",
@@ -1508,6 +1508,7 @@ class CancelRideView(APIView):
             # Update ride status
             ride.status = 'cancelled'
             ride.save(update_fields=["status"])
+            notify_ride_status(ride)
 
             # Make driver available if cancelled by user
             if ride.driver:
@@ -1613,7 +1614,26 @@ class DistanceRewardAPIView(APIView):
     def post(self, request):
         serializer = DistanceRewardSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            serializer.save()
+            reward = serializer.save()
+
+            
+            tokens = list(User.objects.filter(is_user=True, fcm_token__isnull=False)
+                          .values_list('fcm_token', flat=True))
+            if tokens:
+                notification_text = reward.heading if reward.heading else f"Reward for {reward.min_distance}-{reward.max_distance} km rides."
+                data_payload = {
+                    "type": "cashback",
+                    "min_distance": str(reward.min_distance),
+                    "max_distance": str(reward.max_distance),
+                    "cashback": str(reward.cashback),
+                    "water_bottles": str(reward.water_bottles),
+                    "tea": str(reward.tea)
+                }
+                send_Offer(
+                    tokens,
+                    notification={"title": "New Distance Reward Added!", "body": notification_text},
+                    data=data_payload
+                )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1621,7 +1641,26 @@ class DistanceRewardAPIView(APIView):
         reward = get_object_or_404(DistanceReward, pk=pk)
         serializer = DistanceRewardSerializer(reward, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
-            serializer.save()
+            reward = serializer.save()
+
+            # Push notification to all drivers only once
+            tokens = list(User.objects.filter(is_user=True, fcm_token__isnull=False)
+                          .values_list('fcm_token', flat=True))
+            if tokens:
+                notification_text = reward.heading if reward.heading else f"Reward for {reward.min_distance}-{reward.max_distance} km rides has been updated."
+                data_payload = {
+                    "type": "cashback",
+                    "min_distance": str(reward.min_distance),
+                    "max_distance": str(reward.max_distance),
+                    "cashback": str(reward.cashback),
+                    "water_bottles": str(reward.water_bottles),
+                    "tea": str(reward.tea)
+                }
+                send_Offer(
+                    tokens,
+                    notification={"title": "Distance Reward Updated!", "body": notification_text},
+                    data=data_payload
+                )
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1723,7 +1762,20 @@ class DriverIncentiveView(APIView):
 
         serializer = GetDriverIncentiveSerializer(record, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            ride=serializer.save()
+            
+            tokens = list(User.objects.filter(is_driver=True).exclude(fcm_token=None).values_list('fcm_token', flat=True))
+            if tokens:
+                # Visible notification for the popup
+                notification = {
+                    "title": "Incentive Updated!",
+                    "body": f"Incentive for {ride.ride_type} rides has been updated."
+                }
+                # Custom payload for the app to process
+                data_payload = {
+                    "type": "incentive"
+                }
+                send_Offer(tokens, notification=notification, data=data_payload)
             return Response(
                 {"message": "Incentive updated successfully", "data": serializer.data},
                 status=status.HTTP_200_OK
