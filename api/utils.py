@@ -85,7 +85,13 @@ def get_nearby_driver_tokens(pickup_lat, pickup_lng, radius_km=5, vehicle_type=N
     If vehicle_type == 'any' or None, all drivers are included.
     """
     # Base queryset: only drivers with valid FCM tokens
-    drivers = User.objects.exclude(fcm_token__isnull=True).exclude(fcm_token="")
+    drivers = (
+        User.objects.filter(is_driver=True, is_available=True, is_online=True)
+        .exclude(fcm_token__isnull=True)
+        .exclude(fcm_token="")
+        .exclude(current_lat__isnull=True)
+        .exclude(current_lng__isnull=True)
+    )
 
     # Filter by vehicle_type unless it's "any" or empty
     if vehicle_type and vehicle_type.lower() != "any":
