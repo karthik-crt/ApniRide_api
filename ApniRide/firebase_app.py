@@ -15,8 +15,7 @@ def send_Offer(tokens, notification=None, data=None):
     message = messaging.MulticastMessage(
         tokens=tokens,
         notification=messaging.Notification(**notification) if notification else None,
-        data=data or {},
-        priority='max'
+        data=data or {}
     )
     return messaging.send_each_for_multicast(message)  
 

@@ -985,7 +985,8 @@ class RideStatusUpdateView(APIView):
 
     def post(self, request, ride_id):
         user = request.user
-        new_status = request.data.get('status')
+        new_status = request.data['status']
+        print("New status:")
         print("request data:", request.data)
         if new_status not in ['accepted', 'completed', 'cancelled']:
             return Response({
@@ -1003,6 +1004,7 @@ class RideStatusUpdateView(APIView):
 
         
         if new_status == 'accepted':
+            print("Entered accepted block")
             if ride.status != 'pending':
                 return Response({
                     "statusCode": "0",
@@ -1017,6 +1019,11 @@ class RideStatusUpdateView(APIView):
             ride.status = 'accepted'
 
         elif new_status == 'completed':
+            print("Entered completed block")
+            print("Ride status in DB:", ride.status)
+            print("Ride driver:", ride.driver, "User:", user)
+            print("request.data keys:", list(request.data.keys()))
+            print("request.data:", request.data)
             if ride.status not in ['accepted', 'ongoing']:
                 return Response({
                     "statusCode": "0",
@@ -1027,13 +1034,36 @@ class RideStatusUpdateView(APIView):
                     "statusCode": "0",
                     "statusMessage": "You are not authorized to complete this ride."
                 }, status=status.HTTP_403_FORBIDDEN)
+            
+            try:
+                distance = request.data.get('distance')
+                vehicle_type = request.data.get('vehicle_type')
+
+                print("Distance from request:", distance)
+                print("Vehicle type from request:", vehicle_type) 
+                overall = calculate_fare(vehicle_type, distance)
+                fare = int(overall['total_user_pays'])
+                gst_amount =int(overall['gst_amount'])
+                commission_amount = int(overall['commission_amount'])
+                driver_earnings = int(overall['driver_earnings'])
+                company_revenue = int(overall['company_revenue'])
+                # driver_incentive, customer_reward = calculate_incentives_and_rewards(distance_km)
+            except Exception as e:
+                raise ValidationError(f"Error calculating fare or incentives: {str(e)}")
+
             ride.status = 'completed'
             ride.completed = True
             ride.paid = True
+            ride.fare = fare
+            ride.gst_amount = gst_amount
+            ride.fare_estimate = company_revenue+gst_amount
+            ride.commission_amount = commission_amount
             ride.completed_at = timezone.now()
             ride.driver.is_available = True
+            ride.save()
             ride.driver.save()
-            driver_earnings = Decimal(ride.driver_earnings)
+            print("Fare calculated:", ride.fare)
+            # driver_earnings = Decimal(ride.driver_earnings)
             driver_incentive = Decimal(ride.driver_incentive or 0)  
 
             earning_amount = driver_earnings + driver_incentive  
@@ -1071,6 +1101,8 @@ class RideStatusUpdateView(APIView):
 
             update_driver_incentive_progress(user, ride)
         elif new_status == 'cancelled':
+            print("Entered cancelled block")
+
             if ride.status in ['completed', 'cancelled', 'cancelled_by_user']:
                 return Response({
                     "statusCode": "0",

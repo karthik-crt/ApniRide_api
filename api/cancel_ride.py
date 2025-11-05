@@ -46,7 +46,7 @@ class UserCancelRideViews(APIView):
 
         charge = Decimal(policy.charge_amount) if cancelled_count >= policy.free_cancellations else Decimal("0.00")
 
-        # ✅ Handle wallets
+        #  Handle wallets
         ride_wallet = ride.user.wallet
         admin_wallet, _ = AdminWallet.objects.get_or_create(name="Platform Wallet")
 
@@ -86,16 +86,17 @@ class UserCancelRideViews(APIView):
             ride.cancellation_charge = Decimal("0.00")
             charge_status = "free cancellation"
 
-        # ✅ Update ride status
+        #  Update ride status
         ride.status = 'cancelled_by_user'
         ride.is_cancelled_by_user = True
         ride.cancelled_at = timezone.now()
+        ride.driver.is_available = True
         ride.save(update_fields=["status", "is_cancelled_by_user", "cancelled_at", "cancellation_charge"])
 
-        # ✅ Notify via WebSocket / FCM
+        #  Notify via WebSocket / FCM
         notify_ride_status(ride)
 
-        # ✅ Response
+        #  Response
         return Response({
             "statusCode": "1",
             "statusMessage": "Ride cancelled successfully",
