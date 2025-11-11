@@ -163,6 +163,7 @@ class RideLocationConsumer(AsyncWebsocketConsumer):
         data = json.loads(text_data)
         latitude = data.get("lat")
         longitude = data.get("lng")
+        kilo = data.get("kilo")
 
         # Broadcast location to group
         await self.channel_layer.group_send(
@@ -170,14 +171,16 @@ class RideLocationConsumer(AsyncWebsocketConsumer):
             {
                 "type": "location_update",
                 "lat": latitude,
-                "lng": longitude
+                "lng": longitude,
+                "kilo":kilo
             }
         )
 
     async def location_update(self, event):
         await self.send(text_data=json.dumps({
             "lat": event["lat"],
-            "lng": event["lng"]
+            "lng": event["lng"],
+            "kilo":event["kilo"]
         }))
 
     async def ride_status_update(self, event):
