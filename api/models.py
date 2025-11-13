@@ -25,7 +25,7 @@ class User(AbstractUser):
     pan_card = models.FileField(upload_to='documents/pan_card/', null=True, blank=True)
     vehicle_type = models.CharField(max_length=50, null=True, blank=True)
     model = models.CharField(max_length=50, null=True, blank=True)
-    plate_number = models.CharField(max_length=20, null=True, blank=True)
+    plate_number = models.CharField(max_length=20, null=True, blank=True,unique=True)
     state = models.CharField(max_length=50, null=True, blank=True) 
     is_online = models.BooleanField(default=False)
     current_lat = models.FloatField(null=True, blank=True)

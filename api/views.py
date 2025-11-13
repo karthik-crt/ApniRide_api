@@ -575,7 +575,7 @@ class RejectRideView(APIView):
     def post(self, request, ride_id):
         user = request.user
         if not user.is_driver:
-            return Response({"statusCode": "0", "error": "Only drivers can reject rides."}, status=403)
+            return Response({"statusCode": "0", "error": "Only drivers can reject rides."}, status=200)
 
         try:
             ride = Ride.objects.get(id=ride_id, status='pending')
@@ -588,7 +588,7 @@ class RejectRideView(APIView):
 
         # Prevent rejecting same ride multiple times
         if user in ride.rejected_by.all():
-            return Response({"statusCode": "0", "error": "You have already rejected this ride."}, status=400)
+            return Response({"statusCode": "0", "error": "You have already rejected this ride."}, status=200)
 
         # Add to rejected_by
         ride.rejected_by.add(user)
@@ -778,7 +778,7 @@ class UserLoginView(APIView):
             return Response({
                 "statusCode": "0",
                 "statusMessage": "Mobile number is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            })
 
         user = User.objects.filter(mobile=mobile).first()
         if user:
@@ -808,19 +808,19 @@ class UserRegisterView(APIView):
             return Response({
                 "statusCode": "0",
                 "statusMessage": "Mobile and username are required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            })
 
         if User.objects.filter(mobile=mobile).exists():
             return Response({
                 "statusCode": "0",
                 "statusMessage": "User already exists"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            })
 
         if User.objects.filter(email=email).exists():
             return Response({
                 "statusCode": "0",
                 "statusMessage": "email already exists"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            })
         user = User.objects.create(
             mobile=mobile,
             username=username,
@@ -846,12 +846,12 @@ class DriverLoginView(APIView):
             return Response({
                 "statusCode": "0",
                 "statusMessage": "Mobile number is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            })
         if not fcm_token:
             return Response({
                 "statusCode": "0",
                 "statusMessage": "FCM token is required"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            })
             
         driver = User.objects.filter(mobile=mobile, is_driver=1).first()
         if driver:
@@ -929,13 +929,13 @@ class DriverRegisterView(APIView):
             return Response({
                 "statusCode": "0",
                 "statusMessage": "All fields are required for driver registration"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            })
 
         if User.objects.filter(mobile=mobile).exists():
             return Response({
                 "statusCode": "0",
                 "statusMessage": "Driver already exists"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            })
 
     
         driver = User.objects.create(
@@ -1574,7 +1574,7 @@ class CancelRideView(APIView):
                     updated_at__gte=since
                 ).count()
 
-                if cancelled_count >= 3:
+                if cancelled_count >= 100:
                     ride.driver.account_status = "suspended"
                     ride.driver.suspended_until = timezone.now() + timedelta(days=1)
                     ride.driver.is_available = False
@@ -1663,7 +1663,7 @@ class DistanceRewardAPIView(APIView):
                 }
                 send_Offer(
                     tokens,
-                    notification={"title": "New Distance Reward Added!", "body": notification_text},
+                    notification={"title": "New Cashback Added!", "body": notification_text},
                     data=data_payload
                 )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -1993,7 +1993,7 @@ class DriverOnlineStatusUpdateView(generics.UpdateAPIView):
                 "statusMessage": "Driver online status updated successfully",
                 "is_online": serializer.data['is_online']
             }, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors)
 
     def get(self, request, *args, **kwargs):
         driver = self.get_object()
