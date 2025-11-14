@@ -90,7 +90,9 @@ class UserCancelRideViews(APIView):
         ride.status = 'cancelled_by_user'
         ride.is_cancelled_by_user = True
         ride.cancelled_at = timezone.now()
-        ride.driver.is_available = True
+        if ride.driver: 
+            ride.driver.is_available = True
+            ride.driver.save(update_fields=["is_available"])
         ride.save(update_fields=["status", "is_cancelled_by_user", "cancelled_at", "cancellation_charge"])
 
         #  Notify via WebSocket / FCM
