@@ -930,7 +930,11 @@ class DriverRegisterView(APIView):
                 "statusCode": "0",
                 "statusMessage": "All fields are required for driver registration"
             })
-
+        if User.objects.filter(plate_number=plate_number).exists():
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "Vehicle number already exists"
+            })
         if User.objects.filter(mobile=mobile).exists():
             return Response({
                 "statusCode": "0",
