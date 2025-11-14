@@ -907,7 +907,7 @@ class LogoutView(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
 
-
+from django.db import IntegrityError
 class DriverRegisterView(APIView):
     parser_classes = [MultiPartParser, FormParser]  
 
@@ -935,29 +935,38 @@ class DriverRegisterView(APIView):
                 "statusCode": "0",
                 "statusMessage": "Vehicle number already exists"
             })
+        if User.objects.filter(email=email).exists():
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "Email already exists"
+            })
         if User.objects.filter(mobile=mobile).exists():
             return Response({
                 "statusCode": "0",
                 "statusMessage": "Driver already exists"
             })
 
-    
-        driver = User.objects.create(
-            mobile=mobile,
-            username=username,
-            email=email,
-            is_driver=1,
-            vehicle_type=vehicle_type,
-            model=model,
-            plate_number=plate_number,
-            state=state,
-            driving_license=driving_license,
-            rc_book=rc_book,
-            aadhaar=aadhaar,
-            pan_card=pan_card,
-            fcm_token=fcm_token
-        )
-
+        try:
+            driver = User.objects.create(
+                mobile=mobile,
+                username=username,
+                email=email,
+                is_driver=1,
+                vehicle_type=vehicle_type,
+                model=model,
+                plate_number=plate_number,
+                state=state,
+                driving_license=driving_license,
+                rc_book=rc_book,
+                aadhaar=aadhaar,
+                pan_card=pan_card,
+                fcm_token=fcm_token
+            )
+        except IntegrityError:
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "Duplicate entry found"
+            })
         tokens = get_tokens_for_user(driver)
         driver_data = UserLoginSerializer(driver).data
 
