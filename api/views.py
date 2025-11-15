@@ -771,9 +771,37 @@ def get_tokens_for_user(user):
         "refresh": str(refresh)
     }
 
+# class UserLoginView(APIView):
+#     def post(self, request):
+#         mobile = request.data.get('mobile')
+#         if not mobile:
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "Mobile number is required"
+#             })
+
+#         user = User.objects.filter(mobile=mobile).first()
+#         if user:
+#             tokens = get_tokens_for_user(user)
+#             user_data = UserLoginSerializer(user).data
+#             return Response({
+#                 "statusCode": "1",
+#                 "statusMessage": "Login successful",
+#                 "is_oldUser": True,
+#                 **tokens,
+#                 **user_data
+#             })
+#         else:
+#             return Response({
+#                 "statusCode": "1",
+#                 "statusMessage": "New User",
+#                 "is_oldUser": False
+#             })
+
 class UserLoginView(APIView):
     def post(self, request):
         mobile = request.data.get('mobile')
+
         if not mobile:
             return Response({
                 "statusCode": "0",
@@ -781,22 +809,73 @@ class UserLoginView(APIView):
             })
 
         user = User.objects.filter(mobile=mobile).first()
-        if user:
-            tokens = get_tokens_for_user(user)
-            user_data = UserLoginSerializer(user).data
-            return Response({
-                "statusCode": "1",
-                "statusMessage": "Login successful",
-                "is_oldUser": True,
-                **tokens,
-                **user_data
-            })
-        else:
+
+        if not user:
             return Response({
                 "statusCode": "1",
                 "statusMessage": "New User",
                 "is_oldUser": False
             })
+
+        #  BLOCK: Driver trying to login in User App
+        if user.is_driver == 1:
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "This mobile belongs to a Driver. Use Driver Login."
+            })
+
+        #  Allow normal user login
+        tokens = get_tokens_for_user(user)
+        user_data = UserLoginSerializer(user).data
+
+        return Response({
+            "statusCode": "1",
+            "statusMessage": "Login successful",
+            "is_oldUser": True,
+            **tokens,
+            **user_data
+        })
+
+
+# class UserRegisterView(APIView):
+#     def post(self, request):
+#         mobile = request.data.get('mobile')
+#         username = request.data.get('username')
+#         email = request.data.get('email', "")
+
+#         if not mobile or not username:
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "Mobile and username are required"
+#             })
+
+#         if User.objects.filter(mobile=mobile).exists():
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "User already exists"
+#             })
+
+#         if User.objects.filter(email=email).exists():
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "email already exists"
+#             })
+#         user = User.objects.create(
+#             mobile=mobile,
+#             username=username,
+#             email=email,
+#             is_user=True
+#         )
+
+#         tokens = get_tokens_for_user(user)
+#         user_data = UserLoginSerializer(user).data
+#         return Response({
+#             "statusCode": "1",
+#             "statusMessage": "Login successful",
+#             "is_oldUser": True,
+#             **tokens,
+#             **user_data
+#         })
 
 class UserRegisterView(APIView):
     def post(self, request):
@@ -810,22 +889,38 @@ class UserRegisterView(APIView):
                 "statusMessage": "Mobile and username are required"
             })
 
-        if User.objects.filter(mobile=mobile).exists():
+        #  BLOCK: If this number belongs to a driver
+        if User.objects.filter(mobile=mobile, is_driver=1).exists():
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "This mobile is already registered as a Driver."
+            })
+
+        #  BLOCK: Driver email used
+        if User.objects.filter(email=email, is_driver=1).exists():
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "This email belongs to a Driver account."
+            })
+
+        # Existing user?
+        if User.objects.filter(mobile=mobile, is_user=1).exists():
             return Response({
                 "statusCode": "0",
                 "statusMessage": "User already exists"
             })
 
-        if User.objects.filter(email=email).exists():
+        if User.objects.filter(email=email, is_user=1).exists():
             return Response({
                 "statusCode": "0",
-                "statusMessage": "email already exists"
+                "statusMessage": "Email already exists"
             })
+
         user = User.objects.create(
             mobile=mobile,
             username=username,
             email=email,
-            is_user=True
+            is_user=1
         )
 
         tokens = get_tokens_for_user(user)
@@ -837,28 +932,78 @@ class UserRegisterView(APIView):
             **tokens,
             **user_data
         })
-        
+
+
+# class DriverLoginView(APIView):
+#     def post(self, request):
+#         mobile = request.data.get('mobile')
+#         fcm_token = request.data.get('fcm_token')
+#         if not mobile:
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "Mobile number is required"
+#             })
+#         if not fcm_token:
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "FCM token is required"
+#             })
+            
+#         driver = User.objects.filter(mobile=mobile, is_driver=1).first()
+#         if driver:
+#             driver.fcm_token = fcm_token
+#             driver.save()
+#             tokens = get_tokens_for_user(driver)
+#             driver_data = UserLoginSerializer(driver).data
+#             return Response({
+#                 "statusCode": "1",
+#                 "statusMessage": "Login successful",
+#                 "is_oldUser": True,
+#                 **tokens,
+#                 **driver_data
+#             })
+#         else:
+#             return Response({
+#                 "statusCode": "1",
+#                 "statusMessage": "New Driver",
+#                 "is_oldUser": False
+#             })
+
 class DriverLoginView(APIView):
     def post(self, request):
         mobile = request.data.get('mobile')
         fcm_token = request.data.get('fcm_token')
+
         if not mobile:
             return Response({
                 "statusCode": "0",
                 "statusMessage": "Mobile number is required"
             })
+
         if not fcm_token:
             return Response({
                 "statusCode": "0",
                 "statusMessage": "FCM token is required"
             })
-            
+
+        #  BLOCK: User trying to login to Driver App
+        user = User.objects.filter(mobile=mobile).first()
+        if user and user.is_user == 1:
+            return Response({
+                "statusCode": "0",
+                "statusMessage": "This mobile belongs to a User. Use User Login."
+            })
+
+        # Get driver
         driver = User.objects.filter(mobile=mobile, is_driver=1).first()
+
         if driver:
             driver.fcm_token = fcm_token
             driver.save()
+
             tokens = get_tokens_for_user(driver)
             driver_data = UserLoginSerializer(driver).data
+            
             return Response({
                 "statusCode": "1",
                 "statusMessage": "Login successful",
@@ -866,12 +1011,14 @@ class DriverLoginView(APIView):
                 **tokens,
                 **driver_data
             })
-        else:
-            return Response({
-                "statusCode": "1",
-                "statusMessage": "New Driver",
-                "is_oldUser": False
-            })
+
+        # New driver (first time)
+        return Response({
+            "statusCode": "1",
+            "statusMessage": "New Driver",
+            "is_oldUser": False
+        })
+
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -908,8 +1055,79 @@ class LogoutView(APIView):
 
 
 from django.db import IntegrityError
+# class DriverRegisterView(APIView):
+#     parser_classes = [MultiPartParser, FormParser]  
+
+#     def post(self, request):
+#         mobile = request.data.get('mobile')
+#         username = request.data.get('username')
+#         email = request.data.get('email', "")
+#         vehicle_type = request.data.get('vehicle_type')
+#         model = request.data.get('model')
+#         plate_number = request.data.get('plate_number')
+#         state = request.data.get('state')
+
+#         driving_license = request.FILES.get('driving_license')
+#         rc_book = request.FILES.get('rc_book')
+#         aadhaar = request.FILES.get('aadhaar')
+#         pan_card = request.FILES.get('pan_card')
+#         fcm_token = request.data.get('fcm_token')
+#         if not all([mobile, username, vehicle_type, model, plate_number, state,fcm_token]):
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "All fields are required for driver registration"
+#             })
+#         if User.objects.filter(plate_number=plate_number).exists():
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "Vehicle number already exists"
+#             })
+#         if User.objects.filter(email=email).exists():
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "Email already exists"
+#             })
+#         if User.objects.filter(mobile=mobile).exists():
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "Driver already exists"
+#             })
+
+#         try:
+#             driver = User.objects.create(
+#                 mobile=mobile,
+#                 username=username,
+#                 email=email,
+#                 is_driver=1,
+#                 vehicle_type=vehicle_type,
+#                 model=model,
+#                 plate_number=plate_number,
+#                 state=state,
+#                 driving_license=driving_license,
+#                 rc_book=rc_book,
+#                 aadhaar=aadhaar,
+#                 pan_card=pan_card,
+#                 fcm_token=fcm_token
+#             )
+#         except IntegrityError:
+#             return Response({
+#                 "statusCode": "0",
+#                 "statusMessage": "Duplicate entry found"
+#             })
+#         tokens = get_tokens_for_user(driver)
+#         driver_data = UserLoginSerializer(driver).data
+
+#         return Response({
+#             "statusCode": "1",
+#             "statusMessage": "Driver registered successfully",
+#             "is_oldUser": True,
+#             **tokens,
+#             **driver_data
+#         })
+
+
 class DriverRegisterView(APIView):
-    parser_classes = [MultiPartParser, FormParser]  
+    parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
         mobile = request.data.get('mobile')
@@ -925,48 +1143,56 @@ class DriverRegisterView(APIView):
         aadhaar = request.FILES.get('aadhaar')
         pan_card = request.FILES.get('pan_card')
         fcm_token = request.data.get('fcm_token')
-        if not all([mobile, username, vehicle_type, model, plate_number, state,fcm_token]):
+
+        if not all([mobile, username, vehicle_type, model, plate_number, state, fcm_token]):
             return Response({
                 "statusCode": "0",
                 "statusMessage": "All fields are required for driver registration"
             })
-        if User.objects.filter(plate_number=plate_number).exists():
+
+        #  BLOCK: User trying to register as Driver
+        if User.objects.filter(mobile=mobile, is_user=1).exists():
             return Response({
                 "statusCode": "0",
-                "statusMessage": "Vehicle number already exists"
+                "statusMessage": "This mobile is registered as a User. Cannot register as Driver."
             })
-        if User.objects.filter(email=email).exists():
+
+        if User.objects.filter(email=email, is_user=1).exists():
             return Response({
                 "statusCode": "0",
-                "statusMessage": "Email already exists"
+                "statusMessage": "This email belongs to a User account."
             })
-        if User.objects.filter(mobile=mobile).exists():
+
+        # Existing driver?
+        if User.objects.filter(mobile=mobile, is_driver=1).exists():
             return Response({
                 "statusCode": "0",
                 "statusMessage": "Driver already exists"
             })
 
-        try:
-            driver = User.objects.create(
-                mobile=mobile,
-                username=username,
-                email=email,
-                is_driver=1,
-                vehicle_type=vehicle_type,
-                model=model,
-                plate_number=plate_number,
-                state=state,
-                driving_license=driving_license,
-                rc_book=rc_book,
-                aadhaar=aadhaar,
-                pan_card=pan_card,
-                fcm_token=fcm_token
-            )
-        except IntegrityError:
+        if User.objects.filter(plate_number=plate_number).exists():
             return Response({
                 "statusCode": "0",
-                "statusMessage": "Duplicate entry found"
+                "statusMessage": "Vehicle number already exists"
             })
+
+        #  Register driver
+        driver = User.objects.create(
+            mobile=mobile,
+            username=username,
+            email=email,
+            is_driver=1,
+            vehicle_type=vehicle_type,
+            model=model,
+            plate_number=plate_number,
+            state=state,
+            driving_license=driving_license,
+            rc_book=rc_book,
+            aadhaar=aadhaar,
+            pan_card=pan_card,
+            fcm_token=fcm_token
+        )
+
         tokens = get_tokens_for_user(driver)
         driver_data = UserLoginSerializer(driver).data
 
@@ -977,6 +1203,7 @@ class DriverRegisterView(APIView):
             **tokens,
             **driver_data
         })
+
 
 class BookingStatusAPIView(APIView):
     permission_classes =[permissions.IsAuthenticated]
