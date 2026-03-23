@@ -2,9 +2,10 @@ from django.utils import timezone
 from django.db import transaction
 from .models import User
 import logging
-
+from celery import shared_task
 logger = logging.getLogger(__name__)
 
+# @shared_task
 def auto_reactivate_users():
     """Re-activate suspended users whose suspension time has expired."""
     now = timezone.now()
@@ -17,7 +18,8 @@ def auto_reactivate_users():
         for user in expired_users:
             user.account_status = "active"
             user.suspended_until = None
-            user.save(update_fields=["account_status", "suspended_until"])
+            user.is_available = True
+            user.save(update_fields=["account_status", "suspended_until","is_available"])
 
             logger.info(f" Auto reactivated user {user.id}")
 from celery import shared_task

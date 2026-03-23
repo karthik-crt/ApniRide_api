@@ -253,6 +253,11 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'api.tasks.auto_cancel_pending_rides',
         'schedule': crontab(minute='*/5'),  # every 5 minutes
     },
+
+    # 'auto-reactivate-suspended-users-every-10-minutes': {
+    #     'task': 'api.tasks.auto_reactivate_users',
+    #     'schedule': crontab(minute='*/1'),
+    # },
 }
 
 

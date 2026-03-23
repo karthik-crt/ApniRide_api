@@ -146,7 +146,7 @@ class WalletWithdrawView(generics.GenericAPIView):
                 "StatusCode": "0",
                 "StatusMessage": str(e),
                 "balance": wallet.balance
-            }, status=status.HTTP_400_BAD_REQUEST)
+            }, status=status.HTTP_200_OK)
 
         driver_wallet = DriverWallet.objects.get(driver=request.user)
 
