@@ -18,68 +18,7 @@ from .utils import (
 from .serializers import RideSerializer
 from ApniRide.firebase_app import send_multicast
 
-# APScheduler imports
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.date import DateTrigger
-from django_apscheduler.jobstores import register_events
-
 logger = logging.getLogger(__name__)
-
-# Scheduler instance
-scheduler = BackgroundScheduler(timezone="UTC")
-
-def start_scheduler():
-    """Start the APScheduler if not running"""
-    if not scheduler.running:
-        register_events(scheduler)
-        scheduler.start()
-        logger.info("APScheduler started successfully.")
-
-def schedule_ride_notification(ride_id, pickup_time):
-    """Schedule a ride notification for later rides"""
-    trigger = DateTrigger(run_date=pickup_time)
-    scheduler.add_job(
-        send_ride_notification,
-        trigger=trigger,
-        args=[ride_id],
-        id=f"ride_notification_{ride_id}",
-        replace_existing=True,
-    )
-    logger.info(f"Notification scheduled for ride {ride_id} at {pickup_time}")
-
-def send_ride_notification(ride_id):
-    """Send notifications to nearby drivers for a scheduled ride"""
-    try:
-        ride = Ride.objects.get(id=ride_id)
-        tokens = get_nearby_driver_tokens(ride.pickup_lat, ride.pickup_lng)
-
-        if not tokens:
-            logger.warning(f"⚠️ No drivers found for scheduled ride {ride.id}.")
-            return
-
-        notification = {
-            "title": "New Ride Request 🚖",
-            "body": f"Pickup near you: {ride.pickup} - {ride.drop}"
-        }
-        data_payload = {
-            "ride_id": str(ride.id),
-            "booking_id": str(ride.booking_id),
-            "pickup_location": str(ride.pickup),
-            "drop_location": str(ride.drop),
-            "driver_to_pickup_km": "0",  # Default for scheduled
-            "pickup_to_drop_km": str(round(ride.distance_km, 2)),
-            "action": "NEW_RIDE"
-        }
-
-        response = send_multicast(tokens, notification=notification, data=data_payload)
-        logger.info(f"📨 Scheduled notification sent for ride {ride.id}, response: {response}")
-
-    except Ride.DoesNotExist:
-        logger.error(f"❌ Ride {ride_id} not found for scheduled notification.")
-    except Exception as e:
-        logger.error(f"❌ Error sending scheduled ride notification for ride {ride_id}: {e}")
-
-
 class RideSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True)
     driver_name = serializers.CharField(source="driver.username", read_only=True, allow_null=True)

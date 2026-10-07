@@ -37,12 +37,14 @@ ALLOWED_HOSTS = ["*"]
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:2000",
     "http://localhost:4200",
-    "https://admin.apniride.org"
+    "https://admin.apniride.org",
+    "http://192.168.1.37:4200"
 ]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:4200",
     "http://127.0.0.1:4200",
-    "https://admin.apniride.org"
+    "https://admin.apniride.org",
+    "http://192.168.1.37:4200"
 ]
 # Application definition
 LOGGING = {
@@ -119,7 +121,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'django_apscheduler',
     'rest_framework_simplejwt.token_blacklist',
 ]
 ASGI_APPLICATION = "ApniRide.asgi.application"
@@ -254,10 +255,10 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute='*/5'),  # every 5 minutes
     },
 
-    # 'auto-reactivate-suspended-users-every-10-minutes': {
-    #     'task': 'api.tasks.auto_reactivate_users',
-    #     'schedule': crontab(minute='*/1'),
-    # },
+    'auto-reactivate-suspended-users-every-10-minutes': {
+        'task': 'api.tasks.auto_reactivate_users',
+        'schedule': crontab(minute='*/1'), # Runs every 1 minute as requested in original apscheduler
+    },
 }
 
 

@@ -9,7 +9,4 @@ class MyAppConfig(AppConfig):
 
     def ready(self):
         import ApniRide.firebase_app
-        if "runserver" in sys.argv or "daphne" in sys.argv:
-            from . import scheduler
-            # Delay scheduler start by 1 second so Django finishes init
-            threading.Timer(1, scheduler.start).start()
+        # APScheduler has been disabled in favor of Celery Beat

@@ -5,7 +5,7 @@ import logging
 from celery import shared_task
 logger = logging.getLogger(__name__)
 
-# @shared_task
+@shared_task
 def auto_reactivate_users():
     """Re-activate suspended users whose suspension time has expired."""
     now = timezone.now()
